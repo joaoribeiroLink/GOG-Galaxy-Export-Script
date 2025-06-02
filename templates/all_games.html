@@ -1,0 +1,583 @@
+{% extends "base.html" %}
+
+{% block title %}All Games - Game Manager{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12 text-center">
+            <h1 class="display-4 mb-3">
+                <i class="bi bi-collection text-primary"></i> All Games
+            </h1>
+            <p class="lead text-muted">Browse your complete game collection</p>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="card bg-gradient-primary text-white text-center">
+                <div class="card-body">
+                    <i class="bi bi-collection display-4 mb-2"></i>
+                    <h3 id="total-count">Loading...</h3>
+                    <p class="mb-0">Total Games</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-gradient-success text-white text-center">
+                <div class="card-body">
+                    <i class="bi bi-check-circle display-4 mb-2"></i>
+                    <h3 id="played-count">-</h3>
+                    <p class="mb-0">Completed</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-gradient-warning text-white text-center">
+                <div class="card-body">
+                    <i class="bi bi-hourglass-split display-4 mb-2"></i>
+                    <h3 id="unplayed-count">-</h3>
+                    <p class="mb-0">Unplayed</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-gradient-info text-white text-center">
+                <div class="card-body">
+                    <i class="bi bi-star-fill display-4 mb-2"></i>
+                    <h3 id="rated-count">-</h3>
+                    <p class="mb-0">Rated Games</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter and Sort Controls -->
+    <div class="row mb-4">
+        <div class="col-lg-10 mx-auto">
+            <div class="card bg-secondary">
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <div class="input-group">
+                                <span class="input-group-text bg-primary text-white">
+                                    <i class="bi bi-search"></i>
+                                </span>
+                                <input type="text" id="filter-input" class="form-control" 
+                                       placeholder="Search all games..." onkeyup="filterGames()">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <select id="status-filter" class="form-select" onchange="filterGames()">
+                                <option value="all">All Games</option>
+                                <option value="played">Played Only</option>
+                                <option value="unplayed">Unplayed Only</option>
+                                <option value="rated">Rated Only</option>
+                                <option value="unrated">Unrated Only</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <select id="sort-select" class="form-select" onchange="sortGames()">
+                                <option value="title">Game Title (A-Z)</option>
+                                <option value="title-desc">Game Title (Z-A)</option>
+                                <option value="platform">Platform</option>
+                                <option value="genre">Genre</option>
+                                <option value="rating-high">Highest Rated</option>
+                                <option value="rating-low">Lowest Rated</option>
+                                <option value="critic-high">Highest Critic Score</option>
+                                <option value="critic-low">Lowest Critic Score</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <button class="btn btn-outline-primary w-100" onclick="loadAllGames()">
+                                <i class="bi bi-arrow-repeat"></i> Refresh
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Games List -->
+    <div id="games-container">
+        <!-- Games will be loaded here -->
+    </div>
+
+    <!-- Loading Spinner -->
+    <div id="loading" class="text-center">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-2 text-muted">Loading your game collection...</p>
+    </div>
+
+    <!-- No Games Message -->
+    <div id="no-games" class="text-center" style="display: none;">
+        <div class="card bg-info text-dark">
+            <div class="card-body">
+                <i class="bi bi-collection display-2 mb-3"></i>
+                <h3>No Games Found</h3>
+                <p class="mb-3">No games match your current filters.</p>
+                <button class="btn btn-dark" onclick="clearFilters()">
+                    <i class="bi bi-x-circle"></i> Clear Filters
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let allGames = [];
+let filteredGames = [];
+
+// Load all games when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    loadAllGames();
+});
+
+function loadAllGames() {
+    const loading = document.getElementById('loading');
+    const container = document.getElementById('games-container');
+    const noGames = document.getElementById('no-games');
+    
+    loading.style.display = 'block';
+    container.style.display = 'none';
+    noGames.style.display = 'none';
+    
+    fetch('/api/all-games')
+        .then(response => response.json())
+        .then(data => {
+            loading.style.display = 'none';
+            
+            if (data.success && data.games.length > 0) {
+                allGames = data.games;
+                filteredGames = [...allGames];
+                
+                updateStatistics();
+                sortGames();
+                container.style.display = 'block';
+            } else {
+                noGames.style.display = 'block';
+                document.getElementById('total-count').textContent = '0';
+            }
+        })
+        .catch(error => {
+            loading.style.display = 'none';
+            showToast('Error loading games: ' + error.message, 'error');
+        });
+}
+
+function updateStatistics() {
+    const total = allGames.length;
+    const played = allGames.filter(game => game.is_played).length;
+    const unplayed = total - played;
+    const rated = allGames.filter(game => game.myRating && game.myRating.trim()).length;
+    
+    document.getElementById('total-count').textContent = total;
+    document.getElementById('played-count').textContent = played;
+    document.getElementById('unplayed-count').textContent = unplayed;
+    document.getElementById('rated-count').textContent = rated;
+}
+
+function filterGames() {
+    const filterText = document.getElementById('filter-input').value.toLowerCase();
+    const statusFilter = document.getElementById('status-filter').value;
+    
+    filteredGames = allGames.filter(game => {
+        // Text filter
+        const searchText = `${game.title || ''} ${game.genres || ''} ${game.platformList || ''} ${game.developers || ''}`.toLowerCase();
+        const matchesText = !filterText || searchText.includes(filterText);
+        
+        // Status filter
+        let matchesStatus = true;
+        switch (statusFilter) {
+            case 'played':
+                matchesStatus = game.is_played;
+                break;
+            case 'unplayed':
+                matchesStatus = !game.is_played;
+                break;
+            case 'rated':
+                matchesStatus = game.myRating && game.myRating.trim();
+                break;
+            case 'unrated':
+                matchesStatus = !game.myRating || !game.myRating.trim();
+                break;
+        }
+        
+        return matchesText && matchesStatus;
+    });
+    
+    displayGames();
+}
+
+function sortGames() {
+    const sortBy = document.getElementById('sort-select').value;
+    
+    filteredGames.sort((a, b) => {
+        switch (sortBy) {
+            case 'title':
+                return (a.title || '').localeCompare(b.title || '');
+            case 'title-desc':
+                return (b.title || '').localeCompare(a.title || '');
+            case 'platform':
+                return (a.platformList || '').localeCompare(b.platformList || '');
+            case 'genre':
+                return (a.genres || '').localeCompare(b.genres || '');
+            case 'rating-high':
+                return (parseInt(b.myRating || '0')) - (parseInt(a.myRating || '0'));
+            case 'rating-low':
+                return (parseInt(a.myRating || '0')) - (parseInt(b.myRating || '0'));
+            case 'critic-high':
+                return (parseInt(b.criticsScore || '0')) - (parseInt(a.criticsScore || '0'));
+            case 'critic-low':
+                return (parseInt(a.criticsScore || '0')) - (parseInt(b.criticsScore || '0'));
+            default:
+                return 0;
+        }
+    });
+    
+    displayGames();
+}
+
+function displayGames() {
+    const container = document.getElementById('games-container');
+    
+    if (filteredGames.length === 0) {
+        container.innerHTML = `
+            <div class="text-center">
+                <div class="card bg-warning text-dark">
+                    <div class="card-body">
+                        <i class="bi bi-search display-2 mb-3"></i>
+                        <h3>No games match your filters</h3>
+                        <p class="mb-0">Try adjusting your search terms or filters.</p>
+                    </div>
+                </div>
+            </div>
+        `;
+        return;
+    }
+    
+    const gamesHTML = `
+        <div class="row g-4">
+            ${filteredGames.map(game => createGameCard(game)).join('')}
+        </div>
+    `;
+    
+    container.innerHTML = gamesHTML;
+}
+
+function createGameCard(game) {
+    const personalRating = game.myRating || '';
+    const criticScore = game.criticsScore || '';
+    const isPlayed = game.is_played;
+    
+    const personalRatingDisplay = personalRating ? 
+        `<span class="badge bg-success">${personalRating}/100</span>` : 
+        `<span class="badge bg-secondary">Not Rated</span>`;
+    
+    const criticScoreDisplay = criticScore ? 
+        `<span class="badge bg-info">${criticScore}/100</span>` : 
+        `<span class="badge bg-secondary">No Score</span>`;
+    
+    const statusBadge = isPlayed ?
+        `<span class="badge bg-success"><i class="bi bi-check-circle"></i> COMPLETED</span>` :
+        `<span class="badge bg-warning text-dark"><i class="bi bi-hourglass-split"></i> UNPLAYED</span>`;
+    
+    const summary = game.summary ? 
+        (game.summary.length > 120 ? game.summary.substring(0, 120) + '...' : game.summary) :
+        'No description available.';
+    
+    return `
+        <div class="col-lg-6 col-xl-4">
+            <div class="card bg-secondary h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        ${statusBadge}
+                    </div>
+                    
+                    <h5 class="card-title text-primary mb-3">${escapeHtml(game.title || 'Unknown Title')}</h5>
+                    
+                    <div class="game-info mb-3">
+                        <small class="text-muted d-block mb-1">
+                            <i class="bi bi-display text-info"></i> ${escapeHtml(game.platformList || 'Unknown Platform')}
+                        </small>
+                        <small class="text-muted d-block mb-1">
+                            <i class="bi bi-tags text-warning"></i> ${escapeHtml(game.genres || 'Unknown Genre')}
+                        </small>
+                        <small class="text-muted d-block mb-2">
+                            <i class="bi bi-people text-success"></i> ${escapeHtml(game.developers || 'Unknown Developer')}
+                        </small>
+                    </div>
+                    
+                    <!-- Rating Section -->
+                    <div class="rating-section mb-3">
+                        <div class="row mb-2">
+                            <div class="col-6">
+                                <small class="text-muted d-block">
+                                    <i class="bi bi-star-fill text-warning"></i> Your Rating:
+                                </small>
+                                <span id="personal-rating-${escapeHtml(game.title || '')}" class="rating-display">
+                                    ${personalRatingDisplay}
+                                </span>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted d-block">
+                                    <i class="bi bi-award text-info"></i> Critics:
+                                </small>
+                                ${criticScoreDisplay}
+                            </div>
+                        </div>
+                        
+                        <!-- Rating Input -->
+                        <div class="rating-input-row">
+                            <div class="input-group input-group-sm">
+                                <input type="number" class="form-control rating-input" 
+                                       min="0" max="100" step="1" placeholder="0-100" 
+                                       value="${personalRating}" 
+                                       data-game-title="${escapeHtml(game.title || '')}"
+                                       style="max-width: 70px;">
+                                <button class="btn btn-outline-warning btn-sm rate-btn" type="button" 
+                                        onclick="rateGameFromList('${escapeHtml(game.title || '')}', this)">
+                                    <i class="bi bi-star"></i>
+                                </button>
+                                <button class="btn btn-outline-secondary btn-sm clear-btn" type="button" 
+                                        onclick="clearGameRating('${escapeHtml(game.title || '')}', this)">
+                                    <i class="bi bi-x"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <p class="card-text small text-muted mb-3">${escapeHtml(summary)}</p>
+                    
+                    <div class="d-flex gap-2">
+                        ${isPlayed ? 
+                            `<button class="btn btn-warning btn-sm flex-fill" onclick="markAsUnplayed('${escapeHtml(game.title || '')}', this)">
+                                <i class="bi bi-arrow-counterclockwise"></i> Mark Unplayed
+                            </button>` :
+                            `<button class="btn btn-success btn-sm flex-fill" onclick="markAsPlayed('${escapeHtml(game.title || '')}', this)">
+                                <i class="bi bi-check-circle"></i> Mark Played
+                            </button>`
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function clearFilters() {
+    document.getElementById('filter-input').value = '';
+    document.getElementById('status-filter').value = 'all';
+    document.getElementById('sort-select').value = 'title';
+    filteredGames = [...allGames];
+    sortGames();
+}
+
+function markAsPlayed(gameTitle, button) {
+    if (!gameTitle) return;
+    
+    button.disabled = true;
+    button.innerHTML = '<i class="bi bi-clock"></i> Marking...';
+    
+    fetch('/api/mark-played', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            title: gameTitle
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast(data.message, 'success');
+            
+            // Update the game's played status in our data
+            updateGamePlayedStatus(gameTitle, true);
+            
+            // Refresh the display
+            displayGames();
+            updateStatistics();
+        } else {
+            showToast(data.message, 'error');
+            button.disabled = false;
+            button.innerHTML = '<i class="bi bi-check-circle"></i> Mark Played';
+        }
+    })
+    .catch(error => {
+        showToast('Error marking game as played: ' + error.message, 'error');
+        button.disabled = false;
+        button.innerHTML = '<i class="bi bi-check-circle"></i> Mark Played';
+    });
+}
+
+function markAsUnplayed(gameTitle, button) {
+    if (!gameTitle) return;
+    
+    button.disabled = true;
+    button.innerHTML = '<i class="bi bi-clock"></i> Removing...';
+    
+    fetch('/api/mark-unplayed', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            title: gameTitle
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast(data.message, 'success');
+            
+            // Update the game's played status in our data
+            updateGamePlayedStatus(gameTitle, false);
+            
+            // Refresh the display
+            displayGames();
+            updateStatistics();
+        } else {
+            showToast(data.message, 'error');
+            button.disabled = false;
+            button.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i> Mark Unplayed';
+        }
+    })
+    .catch(error => {
+        showToast('Error marking game as unplayed: ' + error.message, 'error');
+        button.disabled = false;
+        button.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i> Mark Unplayed';
+    });
+}
+
+function updateGamePlayedStatus(gameTitle, isPlayed) {
+    [allGames, filteredGames].forEach(gameArray => {
+        const game = gameArray.find(g => (g.title || '').toLowerCase() === gameTitle.toLowerCase());
+        if (game) {
+            game.is_played = isPlayed;
+        }
+    });
+}
+
+function rateGameFromList(gameTitle, button) {
+    if (!gameTitle) return;
+    
+    const card = button.closest('.card');
+    const ratingInput = card.querySelector('.rating-input');
+    const rating = parseInt(ratingInput.value);
+    
+    if (isNaN(rating) || rating < 0 || rating > 100) {
+        showToast('Please enter a rating between 0 and 100', 'error');
+        return;
+    }
+    
+    button.disabled = true;
+    button.innerHTML = '<i class="bi bi-clock"></i>';
+    
+    fetch('/api/rate-game', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            title: gameTitle,
+            rating: rating
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        button.disabled = false;
+        button.innerHTML = '<i class="bi bi-star"></i>';
+        
+        if (data.success) {
+            showToast(data.message, 'success');
+            
+            // Update the displayed rating
+            const ratingDisplay = card.querySelector('.rating-display');
+            ratingDisplay.innerHTML = `<span class="badge bg-success">${rating}/100</span>`;
+            
+            // Update the game data in our arrays
+            updateGameRatingInArrays(gameTitle, rating);
+            updateStatistics();
+        } else {
+            showToast(data.message, 'error');
+        }
+    })
+    .catch(error => {
+        button.disabled = false;
+        button.innerHTML = '<i class="bi bi-star"></i>';
+        showToast('Error rating game: ' + error.message, 'error');
+    });
+}
+
+function clearGameRating(gameTitle, button) {
+    if (!gameTitle) return;
+    
+    const card = button.closest('.card');
+    button.disabled = true;
+    button.innerHTML = '<i class="bi bi-clock"></i>';
+    
+    fetch('/api/rate-game', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            title: gameTitle,
+            rating: null
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        button.disabled = false;
+        button.innerHTML = '<i class="bi bi-x"></i>';
+        
+        if (data.success) {
+            showToast(data.message, 'success');
+            
+            // Update the displayed rating
+            const ratingDisplay = card.querySelector('.rating-display');
+            ratingDisplay.innerHTML = `<span class="badge bg-secondary">Not Rated</span>`;
+            
+            // Clear the input
+            const ratingInput = card.querySelector('.rating-input');
+            ratingInput.value = '';
+            
+            // Update the game data in our arrays
+            updateGameRatingInArrays(gameTitle, '');
+            updateStatistics();
+        } else {
+            showToast(data.message, 'error');
+        }
+    })
+    .catch(error => {
+        button.disabled = false;
+        button.innerHTML = '<i class="bi bi-x"></i>';
+        showToast('Error clearing rating: ' + error.message, 'error');
+    });
+}
+
+function updateGameRatingInArrays(gameTitle, rating) {
+    [allGames, filteredGames].forEach(gameArray => {
+        const game = gameArray.find(g => (g.title || '').toLowerCase() === gameTitle.toLowerCase());
+        if (game) {
+            game.myRating = rating.toString();
+        }
+    });
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+</script>
+{% endblock %} 

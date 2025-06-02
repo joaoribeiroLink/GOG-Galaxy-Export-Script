@@ -1,0 +1,373 @@
+{% extends "base.html" %}
+
+{% block title %}Random Game - Game Manager{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12 text-center">
+            <h1 class="display-4 mb-3">
+                <i class="bi bi-shuffle text-warning"></i> Random Game Picker
+            </h1>
+            <p class="lead text-muted">Let fate decide your next gaming adventure!</p>
+        </div>
+    </div>
+
+    <!-- Random Game Card -->
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div id="game-card" class="card bg-secondary shadow-lg" style="display: none;">
+                <div class="row g-0">
+                    <div class="col-md-4">
+                        <div class="game-image-container">
+                            <img id="game-image" src="" class="img-fluid rounded-start game-cover" alt="Game Cover">
+                            <div class="game-image-placeholder d-flex align-items-center justify-content-center rounded-start">
+                                <i class="bi bi-controller display-1 text-muted"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-8">
+                        <div class="card-body">
+                            <h3 id="game-title" class="card-title text-primary mb-3">Game Title</h3>
+                            
+                            <div class="game-details">
+                                <div class="detail-item mb-2">
+                                    <i class="bi bi-display text-info"></i>
+                                    <strong>Platform:</strong> <span id="game-platform">Unknown</span>
+                                </div>
+                                
+                                <div class="detail-item mb-2">
+                                    <i class="bi bi-tags text-success"></i>
+                                    <strong>Genre:</strong> <span id="game-genre">Unknown</span>
+                                </div>
+                                
+                                <div class="detail-item mb-2">
+                                    <i class="bi bi-people text-warning"></i>
+                                    <strong>Developer:</strong> <span id="game-developer">Unknown</span>
+                                </div>
+                                
+                                <!-- Rating Section -->
+                                <div class="detail-item mb-3">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="d-flex align-items-center mb-2">
+                                                <i class="bi bi-star-fill text-warning me-2"></i>
+                                                <strong>Your Rating:</strong>
+                                                <span id="game-personal-rating" class="ms-2 badge bg-primary">Not Rated</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="d-flex align-items-center mb-2">
+                                                <i class="bi bi-award text-info me-2"></i>
+                                                <strong>Critic Score:</strong>
+                                                <span id="game-critic-score" class="ms-2 badge bg-info">No Score</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Rating Input -->
+                                    <div class="rating-input-section mt-3">
+                                        <div class="row align-items-center">
+                                            <div class="col-md-8">
+                                                <div class="d-flex align-items-center">
+                                                    <label for="rating-input" class="form-label me-2 mb-0">Rate this game (0-100):</label>
+                                                    <input type="number" id="rating-input" class="form-control me-2" 
+                                                           min="0" max="100" step="1" placeholder="Rating" style="width: 80px;">
+                                                    <button id="rate-btn" class="btn btn-outline-warning btn-sm me-2" onclick="rateGame()">
+                                                        <i class="bi bi-star"></i> Rate
+                                                    </button>
+                                                    <button id="clear-rating-btn" class="btn btn-outline-secondary btn-sm" onclick="clearRating()">
+                                                        <i class="bi bi-x-circle"></i> Clear
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="detail-item mb-3">
+                                    <i class="bi bi-file-text text-secondary"></i>
+                                    <strong>Description:</strong>
+                                    <p id="game-summary" class="mt-2 text-muted">No description available.</p>
+                                </div>
+                            </div>
+                            
+                            <div class="game-actions">
+                                <button id="mark-played-btn" class="btn btn-success me-2" onclick="markAsPlayed()">
+                                    <i class="bi bi-check-circle"></i> Mark as Played
+                                </button>
+                                <button class="btn btn-warning" onclick="getRandomGame()">
+                                    <i class="bi bi-arrow-repeat"></i> Pick Another
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="row mt-4">
+        <div class="col-12 text-center">
+            <button id="pick-game-btn" class="btn btn-primary btn-lg me-3" onclick="getRandomGame()">
+                <i class="bi bi-dice-3"></i> Pick Random Game
+            </button>
+            
+            <div class="mt-3">
+                <span id="remaining-count" class="badge bg-info fs-6">
+                    <i class="bi bi-hourglass-split"></i> Click to see remaining games
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Spinner -->
+    <div id="loading" class="text-center" style="display: none;">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-2 text-muted">Finding your next game...</p>
+    </div>
+
+    <!-- No Games Message -->
+    <div id="no-games" class="text-center" style="display: none;">
+        <div class="card bg-warning text-dark">
+            <div class="card-body">
+                <i class="bi bi-trophy display-2 mb-3"></i>
+                <h3>Congratulations!</h3>
+                <p class="mb-0">You've played all games in your collection! Time to buy more games or replay some favorites.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentGame = null;
+
+function getRandomGame() {
+    const gameCard = document.getElementById('game-card');
+    const loading = document.getElementById('loading');
+    const noGames = document.getElementById('no-games');
+    const pickBtn = document.getElementById('pick-game-btn');
+    
+    // Hide everything and show loading
+    gameCard.style.display = 'none';
+    noGames.style.display = 'none';
+    loading.style.display = 'block';
+    pickBtn.disabled = true;
+    
+    fetch('/api/random-game')
+        .then(response => response.json())
+        .then(data => {
+            loading.style.display = 'none';
+            pickBtn.disabled = false;
+            
+            if (data.success) {
+                currentGame = data.game;
+                displayGame(data.game);
+                updateRemainingCount(data.remaining);
+                gameCard.style.display = 'block';
+            } else {
+                noGames.style.display = 'block';
+                document.getElementById('remaining-count').innerHTML = 
+                    '<i class="bi bi-trophy"></i> Collection Complete!';
+            }
+        })
+        .catch(error => {
+            loading.style.display = 'none';
+            pickBtn.disabled = false;
+            showToast('Error loading game: ' + error.message, 'error');
+        });
+}
+
+function displayGame(game) {
+    document.getElementById('game-title').textContent = game.title;
+    document.getElementById('game-platform').textContent = game.platform || 'Unknown';
+    document.getElementById('game-genre').textContent = game.genre || 'Unknown';
+    document.getElementById('game-developer').textContent = game.developer || 'Unknown';
+    document.getElementById('game-summary').textContent = game.summary || 'No description available.';
+    
+    // Display ratings
+    const personalRating = game.my_rating || '';
+    const criticScore = game.critics_score || '';
+    
+    // Format and display personal rating
+    if (personalRating && personalRating !== '') {
+        document.getElementById('game-personal-rating').textContent = personalRating + '/100';
+        document.getElementById('game-personal-rating').className = 'ms-2 badge bg-success';
+        document.getElementById('rating-input').value = personalRating;
+    } else {
+        document.getElementById('game-personal-rating').textContent = 'Not Rated';
+        document.getElementById('game-personal-rating').className = 'ms-2 badge bg-secondary';
+        document.getElementById('rating-input').value = '';
+    }
+    
+    // Format and display critic score
+    if (criticScore && criticScore !== '') {
+        document.getElementById('game-critic-score').textContent = criticScore + '/100';
+        document.getElementById('game-critic-score').className = 'ms-2 badge bg-info';
+    } else {
+        document.getElementById('game-critic-score').textContent = 'No Score';
+        document.getElementById('game-critic-score').className = 'ms-2 badge bg-secondary';
+    }
+    
+    // Handle game image
+    const gameImage = document.getElementById('game-image');
+    const imagePlaceholder = document.querySelector('.game-image-placeholder');
+    
+    if (game.vertical_cover || game.square_icon) {
+        const imageUrl = game.vertical_cover || game.square_icon;
+        gameImage.src = imageUrl;
+        gameImage.style.display = 'block';
+        imagePlaceholder.style.display = 'none';
+        
+        gameImage.onerror = function() {
+            gameImage.style.display = 'none';
+            imagePlaceholder.style.display = 'flex';
+        };
+    } else {
+        gameImage.style.display = 'none';
+        imagePlaceholder.style.display = 'flex';
+    }
+}
+
+function updateRemainingCount(remaining) {
+    const countElement = document.getElementById('remaining-count');
+    countElement.innerHTML = `<i class="bi bi-hourglass-split"></i> ${remaining} unplayed games remaining`;
+}
+
+function markAsPlayed() {
+    if (!currentGame) return;
+    
+    const markBtn = document.getElementById('mark-played-btn');
+    markBtn.disabled = true;
+    markBtn.innerHTML = '<i class="bi bi-clock"></i> Marking...';
+    
+    fetch('/api/mark-played', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            title: currentGame.title
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast(data.message, 'success');
+            markBtn.innerHTML = '<i class="bi bi-check-circle-fill"></i> Marked as Played';
+            markBtn.classList.remove('btn-success');
+            markBtn.classList.add('btn-outline-success');
+            
+            // Get a new game automatically
+            setTimeout(() => {
+                getRandomGame();
+            }, 2000);
+        } else {
+            showToast(data.message, 'error');
+            markBtn.disabled = false;
+            markBtn.innerHTML = '<i class="bi bi-check-circle"></i> Mark as Played';
+        }
+    })
+    .catch(error => {
+        showToast('Error marking game as played: ' + error.message, 'error');
+        markBtn.disabled = false;
+        markBtn.innerHTML = '<i class="bi bi-check-circle"></i> Mark as Played';
+    });
+}
+
+function rateGame() {
+    if (!currentGame) return;
+    
+    const ratingInput = document.getElementById('rating-input');
+    const rating = parseInt(ratingInput.value);
+    
+    if (isNaN(rating) || rating < 0 || rating > 100) {
+        showToast('Please enter a rating between 0 and 100', 'error');
+        return;
+    }
+    
+    const rateBtn = document.getElementById('rate-btn');
+    rateBtn.disabled = true;
+    rateBtn.innerHTML = '<i class="bi bi-clock"></i> Rating...';
+    
+    fetch('/api/rate-game', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            title: currentGame.title,
+            rating: rating
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        rateBtn.disabled = false;
+        rateBtn.innerHTML = '<i class="bi bi-star"></i> Rate';
+        
+        if (data.success) {
+            showToast(data.message, 'success');
+            // Update the displayed rating
+            document.getElementById('game-personal-rating').textContent = rating + '/100';
+            document.getElementById('game-personal-rating').className = 'ms-2 badge bg-success';
+            currentGame.my_rating = rating.toString();
+        } else {
+            showToast(data.message, 'error');
+        }
+    })
+    .catch(error => {
+        rateBtn.disabled = false;
+        rateBtn.innerHTML = '<i class="bi bi-star"></i> Rate';
+        showToast('Error rating game: ' + error.message, 'error');
+    });
+}
+
+function clearRating() {
+    if (!currentGame) return;
+    
+    const clearBtn = document.getElementById('clear-rating-btn');
+    clearBtn.disabled = true;
+    clearBtn.innerHTML = '<i class="bi bi-clock"></i> Clearing...';
+    
+    fetch('/api/rate-game', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            title: currentGame.title,
+            rating: null
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        clearBtn.disabled = false;
+        clearBtn.innerHTML = '<i class="bi bi-x-circle"></i> Clear';
+        
+        if (data.success) {
+            showToast(data.message, 'success');
+            // Update the displayed rating
+            document.getElementById('game-personal-rating').textContent = 'Not Rated';
+            document.getElementById('game-personal-rating').className = 'ms-2 badge bg-secondary';
+            document.getElementById('rating-input').value = '';
+            currentGame.my_rating = '';
+        } else {
+            showToast(data.message, 'error');
+        }
+    })
+    .catch(error => {
+        clearBtn.disabled = false;
+        clearBtn.innerHTML = '<i class="bi bi-x-circle"></i> Clear';
+        showToast('Error clearing rating: ' + error.message, 'error');
+    });
+}
+
+// Auto-load a game when the page loads
+document.addEventListener('DOMContentLoaded', function() {
+    getRandomGame();
+});
+</script>
+{% endblock %} 

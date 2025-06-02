@@ -1,0 +1,573 @@
+{% extends "base.html" %}
+
+{% block title %}Played Games - Game Manager{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12 text-center">
+            <h1 class="display-4 mb-3">
+                <i class="bi bi-check-circle text-success"></i> Played Games
+            </h1>
+            <p class="lead text-muted">View and manage your completed games collection</p>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="card bg-gradient-success text-white text-center">
+                <div class="card-body">
+                    <i class="bi bi-trophy display-4 mb-2"></i>
+                    <h3 id="played-count">Loading...</h3>
+                    <p class="mb-0">Games Completed</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-gradient-info text-white text-center">
+                <div class="card-body">
+                    <i class="bi bi-calendar-check display-4 mb-2"></i>
+                    <h3 id="recent-played">-</h3>
+                    <p class="mb-0">Most Recently Played</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-gradient-warning text-white text-center">
+                <div class="card-body">
+                    <i class="bi bi-star-fill display-4 mb-2"></i>
+                    <h3 id="average-rating">-</h3>
+                    <p class="mb-0">Average Rating</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-gradient-primary text-white text-center">
+                <div class="card-body">
+                    <i class="bi bi-percent display-4 mb-2"></i>
+                    <h3 id="completion-rate">Loading...</h3>
+                    <p class="mb-0">Completion Rate</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter and Sort Controls -->
+    <div class="row mb-4">
+        <div class="col-lg-8 mx-auto">
+            <div class="card bg-secondary">
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="input-group">
+                                <span class="input-group-text bg-primary text-white">
+                                    <i class="bi bi-search"></i>
+                                </span>
+                                <input type="text" id="filter-input" class="form-control" 
+                                       placeholder="Filter played games..." onkeyup="filterGames()">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <select id="sort-select" class="form-select" onchange="sortGames()">
+                                <option value="recent">Recently Played</option>
+                                <option value="title">Game Title (A-Z)</option>
+                                <option value="platform">Platform</option>
+                                <option value="genre">Genre</option>
+                                <option value="rating-high">Highest Rated</option>
+                                <option value="rating-low">Lowest Rated</option>
+                                <option value="unrated">Unrated Games</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <button class="btn btn-outline-primary w-100" onclick="loadPlayedGames()">
+                                <i class="bi bi-arrow-repeat"></i> Refresh
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Played Games List -->
+    <div id="played-games-container">
+        <!-- Games will be loaded here -->
+    </div>
+
+    <!-- Loading Spinner -->
+    <div id="loading" class="text-center">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-2 text-muted">Loading your played games...</p>
+    </div>
+
+    <!-- No Played Games Message -->
+    <div id="no-played-games" class="text-center" style="display: none;">
+        <div class="card bg-info text-dark">
+            <div class="card-body">
+                <i class="bi bi-controller display-2 mb-3"></i>
+                <h3>No Played Games Yet</h3>
+                <p class="mb-3">You haven't completed any games yet. Start playing and mark games as completed to see them here!</p>
+                <div class="d-flex justify-content-center gap-3">
+                    <a href="{{ url_for('random_game') }}" class="btn btn-dark">
+                        <i class="bi bi-shuffle"></i> Pick Random Game
+                    </a>
+                    <a href="{{ url_for('search') }}" class="btn btn-dark">
+                        <i class="bi bi-search"></i> Browse Collection
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let allPlayedGames = [];
+let filteredGames = [];
+
+// Load played games when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    loadPlayedGames();
+    loadStats();
+});
+
+function loadPlayedGames() {
+    const loading = document.getElementById('loading');
+    const container = document.getElementById('played-games-container');
+    const noGames = document.getElementById('no-played-games');
+    
+    loading.style.display = 'block';
+    container.style.display = 'none';
+    noGames.style.display = 'none';
+    
+    fetch('/api/played-games')
+        .then(response => response.json())
+        .then(data => {
+            loading.style.display = 'none';
+            
+            if (data.success && data.games.length > 0) {
+                allPlayedGames = data.games;
+                filteredGames = [...allPlayedGames];
+                
+                // Update played count
+                document.getElementById('played-count').textContent = data.games.length;
+                
+                // Find most recent game
+                const mostRecent = findMostRecentGame(data.games);
+                document.getElementById('recent-played').textContent = mostRecent || 'None';
+                
+                // Calculate average rating
+                const ratings = data.games
+                    .map(game => parseInt(game.myRating || '0'))
+                    .filter(rating => rating > 0);
+                
+                if (ratings.length > 0) {
+                    const avgRating = (ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length).toFixed(1);
+                    document.getElementById('average-rating').textContent = avgRating;
+                } else {
+                    document.getElementById('average-rating').textContent = 'No Ratings';
+                }
+                
+                sortGames();
+                container.style.display = 'block';
+            } else {
+                noGames.style.display = 'block';
+                document.getElementById('played-count').textContent = '0';
+                document.getElementById('average-rating').textContent = '-';
+            }
+        })
+        .catch(error => {
+            loading.style.display = 'none';
+            showToast('Error loading played games: ' + error.message, 'error');
+        });
+}
+
+function loadStats() {
+    // Load completion rate from the stats API (reusing from dashboard)
+    fetch('/api/played-games')
+        .then(response => response.json())
+        .then(data => {
+            // Get total games count from somewhere - we'll make a simple estimation
+            // In a real scenario, you'd want to call a separate stats endpoint
+            const playedCount = data.games ? data.games.length : 0;
+            document.getElementById('completion-rate').textContent = playedCount > 0 ? 'Loaded' : '0%';
+        });
+}
+
+function findMostRecentGame(games) {
+    if (!games || games.length === 0) return null;
+    
+    let mostRecent = games[0];
+    for (let game of games) {
+        if (game.playedDate && (!mostRecent.playedDate || game.playedDate > mostRecent.playedDate)) {
+            mostRecent = game;
+        }
+    }
+    
+    return mostRecent.title || 'Unknown';
+}
+
+function filterGames() {
+    const filterText = document.getElementById('filter-input').value.toLowerCase();
+    
+    if (!filterText) {
+        filteredGames = [...allPlayedGames];
+    } else {
+        filteredGames = allPlayedGames.filter(game => {
+            const searchText = `${game.title || ''} ${game.genres || ''} ${game.platformList || ''} ${game.developers || ''}`.toLowerCase();
+            return searchText.includes(filterText);
+        });
+    }
+    
+    displayGames();
+}
+
+function sortGames() {
+    const sortBy = document.getElementById('sort-select').value;
+    
+    filteredGames.sort((a, b) => {
+        switch (sortBy) {
+            case 'recent':
+                return (b.playedDate || '').localeCompare(a.playedDate || '');
+            case 'title':
+                return (a.title || '').localeCompare(b.title || '');
+            case 'platform':
+                return (a.platformList || '').localeCompare(b.platformList || '');
+            case 'genre':
+                return (a.genres || '').localeCompare(b.genres || '');
+            case 'rating-high':
+                return (b.myRating || '0') - (a.myRating || '0');
+            case 'rating-low':
+                return (a.myRating || '0') - (b.myRating || '0');
+            case 'unrated':
+                return (a.myRating ? 0 : 1) - (b.myRating ? 0 : 1);
+            default:
+                return 0;
+        }
+    });
+    
+    displayGames();
+}
+
+function displayGames() {
+    const container = document.getElementById('played-games-container');
+    
+    if (filteredGames.length === 0) {
+        container.innerHTML = `
+            <div class="text-center">
+                <div class="card bg-warning text-dark">
+                    <div class="card-body">
+                        <i class="bi bi-search display-2 mb-3"></i>
+                        <h3>No games match your filter</h3>
+                        <p class="mb-0">Try adjusting your search terms.</p>
+                    </div>
+                </div>
+            </div>
+        `;
+        return;
+    }
+    
+    const gamesHTML = `
+        <div class="row g-4">
+            ${filteredGames.map(game => createGameCard(game)).join('')}
+        </div>
+    `;
+    
+    container.innerHTML = gamesHTML;
+}
+
+function createGameCard(game) {
+    const playedDate = game.playedDate ? 
+        new Date(game.playedDate).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        }) : 'Unknown date';
+    
+    const summary = game.summary ? 
+        (game.summary.length > 120 ? game.summary.substring(0, 120) + '...' : game.summary) :
+        'No description available.';
+    
+    // Format ratings
+    const personalRating = game.myRating || '';
+    const criticScore = game.criticsScore || '';
+    
+    const personalRatingDisplay = personalRating ? 
+        `<span class="badge bg-success">${personalRating}/100</span>` : 
+        `<span class="badge bg-secondary">Not Rated</span>`;
+    
+    const criticScoreDisplay = criticScore ? 
+        `<span class="badge bg-info">${criticScore}/100</span>` : 
+        `<span class="badge bg-secondary">No Score</span>`;
+    
+    return `
+        <div class="col-lg-6 col-xl-4">
+            <div class="card bg-secondary h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <span class="badge bg-success">
+                            <i class="bi bi-check-circle"></i> COMPLETED
+                        </span>
+                        <small class="text-muted">${playedDate}</small>
+                    </div>
+                    
+                    <h5 class="card-title text-primary mb-3">${escapeHtml(game.title || 'Unknown Title')}</h5>
+                    
+                    <div class="game-info mb-3">
+                        <small class="text-muted d-block mb-1">
+                            <i class="bi bi-display text-info"></i> ${escapeHtml(game.platformList || 'Unknown Platform')}
+                        </small>
+                        <small class="text-muted d-block mb-1">
+                            <i class="bi bi-tags text-warning"></i> ${escapeHtml(game.genres || 'Unknown Genre')}
+                        </small>
+                        <small class="text-muted d-block mb-2">
+                            <i class="bi bi-people text-success"></i> ${escapeHtml(game.developers || 'Unknown Developer')}
+                        </small>
+                    </div>
+                    
+                    <!-- Rating Section -->
+                    <div class="rating-section mb-3">
+                        <div class="row mb-2">
+                            <div class="col-6">
+                                <small class="text-muted d-block">
+                                    <i class="bi bi-star-fill text-warning"></i> Your Rating:
+                                </small>
+                                <span id="personal-rating-${escapeHtml(game.title || '')}" class="rating-display">
+                                    ${personalRatingDisplay}
+                                </span>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted d-block">
+                                    <i class="bi bi-award text-info"></i> Critics:
+                                </small>
+                                ${criticScoreDisplay}
+                            </div>
+                        </div>
+                        
+                        <!-- Rating Input -->
+                        <div class="rating-input-row">
+                            <div class="input-group input-group-sm">
+                                <input type="number" class="form-control rating-input" 
+                                       min="0" max="100" step="1" placeholder="0-100" 
+                                       value="${personalRating}" 
+                                       data-game-title="${escapeHtml(game.title || '')}"
+                                       style="max-width: 70px;">
+                                <button class="btn btn-outline-warning btn-sm rate-btn" type="button" 
+                                        onclick="rateGameFromList('${escapeHtml(game.title || '')}', this)">
+                                    <i class="bi bi-star"></i>
+                                </button>
+                                <button class="btn btn-outline-secondary btn-sm clear-btn" type="button" 
+                                        onclick="clearGameRating('${escapeHtml(game.title || '')}', this)">
+                                    <i class="bi bi-x"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <p class="card-text small text-muted mb-3">${escapeHtml(summary)}</p>
+                    
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-warning btn-sm flex-fill" onclick="markAsUnplayed('${escapeHtml(game.title || '')}', this)">
+                            <i class="bi bi-arrow-counterclockwise"></i> Mark as Unplayed
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function markAsUnplayed(gameTitle, button) {
+    if (!gameTitle) return;
+    
+    // Confirm action
+    if (!confirm(`Are you sure you want to mark "${gameTitle}" as unplayed? This will remove it from your completed games list.`)) {
+        return;
+    }
+    
+    button.disabled = true;
+    button.innerHTML = '<i class="bi bi-clock"></i> Removing...';
+    
+    fetch('/api/mark-unplayed', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            title: gameTitle
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast(data.message, 'success');
+            
+            // Remove the game from the display
+            const card = button.closest('.col-lg-6, .col-xl-4');
+            card.style.animation = 'fadeOut 0.5s ease-out';
+            
+            setTimeout(() => {
+                // Remove from our data arrays
+                allPlayedGames = allPlayedGames.filter(game => 
+                    (game.title || '').toLowerCase() !== gameTitle.toLowerCase()
+                );
+                filteredGames = filteredGames.filter(game => 
+                    (game.title || '').toLowerCase() !== gameTitle.toLowerCase()
+                );
+                
+                // Update count
+                document.getElementById('played-count').textContent = allPlayedGames.length;
+                
+                // Refresh display
+                if (allPlayedGames.length === 0) {
+                    document.getElementById('no-played-games').style.display = 'block';
+                    document.getElementById('played-games-container').style.display = 'none';
+                } else {
+                    displayGames();
+                    
+                    // Update most recent
+                    const mostRecent = findMostRecentGame(allPlayedGames);
+                    document.getElementById('recent-played').textContent = mostRecent || 'None';
+                }
+            }, 500);
+        } else {
+            showToast(data.message, 'error');
+            button.disabled = false;
+            button.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i> Mark as Unplayed';
+        }
+    })
+    .catch(error => {
+        showToast('Error marking game as unplayed: ' + error.message, 'error');
+        button.disabled = false;
+        button.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i> Mark as Unplayed';
+    });
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function rateGameFromList(gameTitle, button) {
+    if (!gameTitle) return;
+    
+    const card = button.closest('.card');
+    const ratingInput = card.querySelector('.rating-input');
+    const rating = parseInt(ratingInput.value);
+    
+    if (isNaN(rating) || rating < 0 || rating > 100) {
+        showToast('Please enter a rating between 0 and 100', 'error');
+        return;
+    }
+    
+    button.disabled = true;
+    button.innerHTML = '<i class="bi bi-clock"></i>';
+    
+    fetch('/api/rate-game', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            title: gameTitle,
+            rating: rating
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        button.disabled = false;
+        button.innerHTML = '<i class="bi bi-star"></i>';
+        
+        if (data.success) {
+            showToast(data.message, 'success');
+            
+            // Update the displayed rating
+            const ratingDisplay = card.querySelector('.rating-display');
+            ratingDisplay.innerHTML = `<span class="badge bg-success">${rating}/100</span>`;
+            
+            // Update the game data in our arrays
+            updateGameRatingInArrays(gameTitle, rating);
+        } else {
+            showToast(data.message, 'error');
+        }
+    })
+    .catch(error => {
+        button.disabled = false;
+        button.innerHTML = '<i class="bi bi-star"></i>';
+        showToast('Error rating game: ' + error.message, 'error');
+    });
+}
+
+function clearGameRating(gameTitle, button) {
+    if (!gameTitle) return;
+    
+    const card = button.closest('.card');
+    button.disabled = true;
+    button.innerHTML = '<i class="bi bi-clock"></i>';
+    
+    fetch('/api/rate-game', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            title: gameTitle,
+            rating: null
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        button.disabled = false;
+        button.innerHTML = '<i class="bi bi-x"></i>';
+        
+        if (data.success) {
+            showToast(data.message, 'success');
+            
+            // Update the displayed rating
+            const ratingDisplay = card.querySelector('.rating-display');
+            ratingDisplay.innerHTML = `<span class="badge bg-secondary">Not Rated</span>`;
+            
+            // Clear the input
+            const ratingInput = card.querySelector('.rating-input');
+            ratingInput.value = '';
+            
+            // Update the game data in our arrays
+            updateGameRatingInArrays(gameTitle, '');
+        } else {
+            showToast(data.message, 'error');
+        }
+    })
+    .catch(error => {
+        button.disabled = false;
+        button.innerHTML = '<i class="bi bi-x"></i>';
+        showToast('Error clearing rating: ' + error.message, 'error');
+    });
+}
+
+function updateGameRatingInArrays(gameTitle, rating) {
+    // Update both arrays with the new rating
+    [allPlayedGames, filteredGames].forEach(gameArray => {
+        const game = gameArray.find(g => (g.title || '').toLowerCase() === gameTitle.toLowerCase());
+        if (game) {
+            game.myRating = rating.toString();
+        }
+    });
+}
+
+// Add fade out animation CSS
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes fadeOut {
+        from { opacity: 1; transform: translateY(0); }
+        to { opacity: 0; transform: translateY(-20px); }
+    }
+`;
+document.head.appendChild(style);
+</script>
+{% endblock %} 

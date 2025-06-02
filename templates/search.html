@@ -1,0 +1,336 @@
+{% extends "base.html" %}
+
+{% block title %}Search - Game Manager{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12 text-center">
+            <h1 class="display-4 mb-3">
+                <i class="bi bi-search text-info"></i> Search Your Collection
+            </h1>
+            <p class="lead text-muted">Find games by title, genre, platform, or developer</p>
+        </div>
+    </div>
+
+    <!-- Search Form -->
+    <div class="row mb-4">
+        <div class="col-lg-8 mx-auto">
+            <div class="card bg-secondary">
+                <div class="card-body">
+                    <form id="search-form" onsubmit="searchGames(event)">
+                        <div class="input-group input-group-lg">
+                            <span class="input-group-text bg-primary text-white">
+                                <i class="bi bi-search"></i>
+                            </span>
+                            <input type="text" id="search-input" class="form-control" 
+                                   placeholder="Search for games..." required>
+                            <button class="btn btn-primary" type="submit">
+                                <i class="bi bi-search"></i> Search
+                            </button>
+                        </div>
+                        <div class="form-text mt-2 text-center">
+                            <small class="text-muted">
+                                Search in game titles, genres, platforms, developers, and descriptions
+                            </small>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search Results -->
+    <div id="search-results" style="display: none;">
+        <div class="row mb-3">
+            <div class="col-12">
+                <h3 id="results-title" class="text-primary">
+                    <i class="bi bi-list-ul"></i> Search Results
+                </h3>
+                <p id="results-count" class="text-muted"></p>
+            </div>
+        </div>
+
+        <div id="results-container" class="row g-4">
+            <!-- Results will be inserted here -->
+        </div>
+    </div>
+
+    <!-- Loading Spinner -->
+    <div id="search-loading" class="text-center" style="display: none;">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Searching...</span>
+        </div>
+        <p class="mt-2 text-muted">Searching your collection...</p>
+    </div>
+
+    <!-- No Results -->
+    <div id="no-results" class="text-center" style="display: none;">
+        <div class="card bg-warning text-dark">
+            <div class="card-body">
+                <i class="bi bi-search display-2 mb-3"></i>
+                <h3>No games found</h3>
+                <p class="mb-0">Try a different search term or check your spelling.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search Tips -->
+    <div class="row mt-5">
+        <div class="col-12">
+            <div class="card bg-secondary">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-lightbulb text-warning"></i> Search Tips
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <ul class="list-unstyled">
+                                <li class="mb-2"><i class="bi bi-check text-success"></i> Search by game title: "Cyberpunk"</li>
+                                <li class="mb-2"><i class="bi bi-check text-success"></i> Search by genre: "RPG" or "Action"</li>
+                                <li class="mb-2"><i class="bi bi-check text-success"></i> Search by platform: "Windows" or "PlayStation"</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <ul class="list-unstyled">
+                                <li class="mb-2"><i class="bi bi-check text-success"></i> Search by developer: "CD Projekt"</li>
+                                <li class="mb-2"><i class="bi bi-check text-success"></i> Partial matches work too</li>
+                                <li class="mb-2"><i class="bi bi-check text-success"></i> Search is case-insensitive</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function searchGames(event) {
+    event.preventDefault();
+    
+    const searchTerm = document.getElementById('search-input').value.trim();
+    if (!searchTerm) return;
+    
+    const loading = document.getElementById('search-loading');
+    const results = document.getElementById('search-results');
+    const noResults = document.getElementById('no-results');
+    
+    // Hide all sections and show loading
+    results.style.display = 'none';
+    noResults.style.display = 'none';
+    loading.style.display = 'block';
+    
+    fetch(`/api/search?q=${encodeURIComponent(searchTerm)}`)
+        .then(response => response.json())
+        .then(data => {
+            loading.style.display = 'none';
+            
+            if (data.success && data.matches.length > 0) {
+                displayResults(data.matches, searchTerm);
+                results.style.display = 'block';
+            } else {
+                noResults.style.display = 'block';
+            }
+        })
+        .catch(error => {
+            loading.style.display = 'none';
+            showToast('Search error: ' + error.message, 'error');
+        });
+}
+
+function displayResults(matches, searchTerm) {
+    const container = document.getElementById('results-container');
+    const resultsTitle = document.getElementById('results-title');
+    const resultsCount = document.getElementById('results-count');
+    
+    resultsTitle.innerHTML = `<i class="bi bi-list-ul"></i> Search Results for "${searchTerm}"`;
+    resultsCount.textContent = `Found ${matches.length} game${matches.length !== 1 ? 's' : ''}`;
+    
+    container.innerHTML = '';
+    
+    matches.forEach(game => {
+        const gameCard = createGameCard(game);
+        container.appendChild(gameCard);
+    });
+}
+
+function createGameCard(game) {
+    const col = document.createElement('div');
+    col.className = 'col-lg-6 col-xl-4';
+    
+    const playedBadge = game.is_played ? 
+        '<span class="badge bg-success mb-2"><i class="bi bi-check-circle"></i> PLAYED</span>' :
+        '<span class="badge bg-warning text-dark mb-2"><i class="bi bi-hourglass-split"></i> UNPLAYED</span>';
+    
+    const summary = game.summary ? 
+        (game.summary.length > 150 ? game.summary.substring(0, 150) + '...' : game.summary) :
+        'No description available.';
+    
+    // Choose the appropriate button based on game status
+    const actionButton = game.is_played ? `
+        <button class="btn btn-warning btn-sm" onclick="markGameAsUnplayed('${escapeHtml(game.title || '')}', this)">
+            <i class="bi bi-arrow-counterclockwise"></i> Mark as Unplayed
+        </button>
+    ` : `
+        <button class="btn btn-success btn-sm" onclick="markGameAsPlayed('${escapeHtml(game.title || '')}', this)">
+            <i class="bi bi-check-circle"></i> Mark as Played
+        </button>
+    `;
+    
+    col.innerHTML = `
+        <div class="card bg-secondary h-100">
+            <div class="card-body">
+                ${playedBadge}
+                <h5 class="card-title text-primary">${escapeHtml(game.title || 'Unknown Title')}</h5>
+                
+                <div class="game-info mb-3">
+                    <small class="text-muted d-block">
+                        <i class="bi bi-display"></i> ${escapeHtml(game.platformList || 'Unknown Platform')}
+                    </small>
+                    <small class="text-muted d-block">
+                        <i class="bi bi-tags"></i> ${escapeHtml(game.genres || 'Unknown Genre')}
+                    </small>
+                    <small class="text-muted d-block">
+                        <i class="bi bi-people"></i> ${escapeHtml(game.developers || 'Unknown Developer')}
+                    </small>
+                </div>
+                
+                <!-- Rating Information -->
+                <div class="rating-info mb-3">
+                    <div class="row">
+                        <div class="col-6">
+                            <small class="text-muted d-block">
+                                <i class="bi bi-star-fill text-warning"></i> Your Rating:
+                                ${game.myRating ? 
+                                    `<span class="badge bg-primary">${game.myRating}/100</span>` : 
+                                    `<span class="badge bg-secondary">Not Rated</span>`
+                                }
+                            </small>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted d-block">
+                                <i class="bi bi-award text-info"></i> Critics:
+                                ${game.criticsScore ? 
+                                    `<span class="badge bg-info">${game.criticsScore}/100</span>` : 
+                                    `<span class="badge bg-secondary">No Score</span>`
+                                }
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                
+                <p class="card-text small text-muted">${escapeHtml(summary)}</p>
+                
+                ${actionButton}
+            </div>
+        </div>
+    `;
+    
+    return col;
+}
+
+function markGameAsPlayed(gameTitle, button) {
+    if (!gameTitle) return;
+    
+    button.disabled = true;
+    button.innerHTML = '<i class="bi bi-clock"></i> Marking...';
+    
+    fetch('/api/mark-played', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            title: gameTitle
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast(data.message, 'success');
+            
+            // Update the card to show as played
+            const card = button.closest('.card');
+            const badge = card.querySelector('.badge');
+            badge.className = 'badge bg-success mb-2';
+            badge.innerHTML = '<i class="bi bi-check-circle"></i> PLAYED';
+            
+            // Replace button with unplayed button
+            button.className = 'btn btn-warning btn-sm';
+            button.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i> Mark as Unplayed';
+            button.onclick = function() { markGameAsUnplayed(gameTitle, this); };
+            button.disabled = false;
+        } else {
+            showToast(data.message, 'error');
+            button.disabled = false;
+            button.innerHTML = '<i class="bi bi-check-circle"></i> Mark as Played';
+        }
+    })
+    .catch(error => {
+        showToast('Error marking game as played: ' + error.message, 'error');
+        button.disabled = false;
+        button.innerHTML = '<i class="bi bi-check-circle"></i> Mark as Played';
+    });
+}
+
+function markGameAsUnplayed(gameTitle, button) {
+    if (!gameTitle) return;
+    
+    button.disabled = true;
+    button.innerHTML = '<i class="bi bi-clock"></i> Unmarking...';
+    
+    fetch('/api/mark-unplayed', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            title: gameTitle
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast(data.message, 'success');
+            
+            // Update the card to show as unplayed
+            const card = button.closest('.card');
+            const badge = card.querySelector('.badge');
+            badge.className = 'badge bg-warning text-dark mb-2';
+            badge.innerHTML = '<i class="bi bi-hourglass-split"></i> UNPLAYED';
+            
+            // Replace button with played button
+            button.className = 'btn btn-success btn-sm';
+            button.innerHTML = '<i class="bi bi-check-circle"></i> Mark as Played';
+            button.onclick = function() { markGameAsPlayed(gameTitle, this); };
+            button.disabled = false;
+        } else {
+            showToast(data.message, 'error');
+            button.disabled = false;
+            button.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i> Mark as Unplayed';
+        }
+    })
+    .catch(error => {
+        showToast('Error marking game as unplayed: ' + error.message, 'error');
+        button.disabled = false;
+        button.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i> Mark as Unplayed';
+    });
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Enable search on Enter key
+document.getElementById('search-input').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        searchGames(e);
+    }
+});
+</script>
+{% endblock %} 

@@ -1,0 +1,306 @@
+{% extends "base.html" %}
+
+{% block title %}Statistics - Game Manager{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12 text-center">
+            <h1 class="display-4 mb-3">
+                <i class="bi bi-bar-chart text-success"></i> Collection Statistics
+            </h1>
+            <p class="lead text-muted">Detailed insights into your gaming collection</p>
+        </div>
+    </div>
+
+    <!-- Main Statistics Cards -->
+    <div class="row g-4 mb-5">
+        <div class="col-md-3">
+            <div class="card bg-gradient-primary text-white text-center h-100">
+                <div class="card-body">
+                    <i class="bi bi-collection-fill display-3 mb-3"></i>
+                    <h2 class="display-5">{{ stats.total_games }}</h2>
+                    <p class="card-text fs-5">Total Games</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-gradient-success text-white text-center h-100">
+                <div class="card-body">
+                    <i class="bi bi-check-circle-fill display-3 mb-3"></i>
+                    <h2 class="display-5">{{ stats.played_games }}</h2>
+                    <p class="card-text fs-5">Games Completed</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-gradient-warning text-white text-center h-100">
+                <div class="card-body">
+                    <i class="bi bi-hourglass-split display-3 mb-3"></i>
+                    <h2 class="display-5">{{ stats.unplayed_games }}</h2>
+                    <p class="card-text fs-5">Backlog</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-gradient-info text-white text-center h-100">
+                <div class="card-body">
+                    <i class="bi bi-trophy-fill display-3 mb-3"></i>
+                    <h2 class="display-5">{{ "%.1f"|format(stats.completion_percentage) }}%</h2>
+                    <p class="card-text fs-5">Completion Rate</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Progress Visualization -->
+    <div class="row mb-5">
+        <div class="col-12">
+            <div class="card bg-secondary">
+                <div class="card-header">
+                    <h4 class="mb-0">
+                        <i class="bi bi-graph-up text-info"></i> Collection Progress
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <div class="progress mb-3" style="height: 30px;">
+                                <div class="progress-bar bg-success progress-bar-striped progress-bar-animated" 
+                                     role="progressbar" 
+                                     style="width: {{ stats.completion_percentage }}%">
+                                    {{ "%.1f"|format(stats.completion_percentage) }}% Complete
+                                </div>
+                            </div>
+                            
+                            <div class="d-flex justify-content-between">
+                                <span class="text-success">
+                                    <i class="bi bi-check-circle"></i> {{ stats.played_games }} Played
+                                </span>
+                                <span class="text-warning">
+                                    <i class="bi bi-hourglass-split"></i> {{ stats.unplayed_games }} Remaining
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4 text-center">
+                            <div class="display-4 text-primary">{{ stats.total_games }}</div>
+                            <div class="text-muted">Total Games in Collection</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Genre and Platform Analysis -->
+    <div class="row g-4 mb-5">
+        <!-- Top Genres -->
+        <div class="col-lg-6">
+            <div class="card bg-secondary h-100">
+                <div class="card-header">
+                    <h4 class="mb-0">
+                        <i class="bi bi-tags text-primary"></i> Top Genres
+                    </h4>
+                </div>
+                <div class="card-body">
+                    {% if stats.top_genres %}
+                        {% for genre, count in stats.top_genres %}
+                        <div class="d-flex justify-content-between align-items-center mb-3 p-2 bg-dark rounded">
+                            <div>
+                                <span class="fw-bold">{{ genre }}</span>
+                                <small class="text-muted d-block">{{ count }} games</small>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge bg-primary fs-6">{{ count }}</span>
+                                <div class="progress mt-1" style="width: 100px; height: 8px;">
+                                    <div class="progress-bar bg-primary" 
+                                         style="width: {{ (count / stats.top_genres[0][1] * 100) }}%"></div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center text-muted">
+                            <i class="bi bi-tags display-4 mb-3"></i>
+                            <p>No genre data available</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Top Platforms -->
+        <div class="col-lg-6">
+            <div class="card bg-secondary h-100">
+                <div class="card-header">
+                    <h4 class="mb-0">
+                        <i class="bi bi-display text-success"></i> Top Platforms
+                    </h4>
+                </div>
+                <div class="card-body">
+                    {% if stats.top_platforms %}
+                        {% for platform, count in stats.top_platforms %}
+                        <div class="d-flex justify-content-between align-items-center mb-3 p-2 bg-dark rounded">
+                            <div>
+                                <span class="fw-bold">{{ platform }}</span>
+                                <small class="text-muted d-block">{{ count }} games</small>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge bg-success fs-6">{{ count }}</span>
+                                <div class="progress mt-1" style="width: 100px; height: 8px;">
+                                    <div class="progress-bar bg-success" 
+                                         style="width: {{ (count / stats.top_platforms[0][1] * 100) }}%"></div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center text-muted">
+                            <i class="bi bi-display display-4 mb-3"></i>
+                            <p>No platform data available</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Additional Statistics -->
+    <div class="row g-4 mb-5">
+        <!-- Completion Analysis -->
+        <div class="col-md-6">
+            <div class="card bg-secondary h-100">
+                <div class="card-header">
+                    <h4 class="mb-0">
+                        <i class="bi bi-pie-chart text-warning"></i> Completion Analysis
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <div class="border-end border-secondary pe-3">
+                                <div class="display-6 text-success">{{ stats.played_games }}</div>
+                                <div class="text-muted small">Games Played</div>
+                                <div class="mt-2">
+                                    <div class="progress mx-auto" style="width: 80px; height: 8px;">
+                                        <div class="progress-bar bg-success" 
+                                             style="width: {{ stats.completion_percentage }}%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="ps-3">
+                                <div class="display-6 text-warning">{{ stats.unplayed_games }}</div>
+                                <div class="text-muted small">Backlog</div>
+                                <div class="mt-2">
+                                    <div class="progress mx-auto" style="width: 80px; height: 8px;">
+                                        <div class="progress-bar bg-warning" 
+                                             style="width: {{ 100 - stats.completion_percentage }}%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr class="my-4">
+                    
+                    <div class="text-center">
+                        {% if stats.completion_percentage >= 75 %}
+                            <i class="bi bi-trophy text-warning display-4 mb-2"></i>
+                            <h5 class="text-warning">Collection Master!</h5>
+                            <p class="text-muted small">You've completed most of your collection!</p>
+                        {% elif stats.completion_percentage >= 50 %}
+                            <i class="bi bi-star text-info display-4 mb-2"></i>
+                            <h5 class="text-info">Great Progress!</h5>
+                            <p class="text-muted small">You're halfway through your collection!</p>
+                        {% elif stats.completion_percentage >= 25 %}
+                            <i class="bi bi-play-circle text-success display-4 mb-2"></i>
+                            <h5 class="text-success">Good Start!</h5>
+                            <p class="text-muted small">Keep playing to increase your completion rate!</p>
+                        {% else %}
+                            <i class="bi bi-controller text-primary display-4 mb-2"></i>
+                            <h5 class="text-primary">Just Getting Started!</h5>
+                            <p class="text-muted small">So many games to discover!</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- System Information -->
+        <div class="col-md-6">
+            <div class="card bg-secondary h-100">
+                <div class="card-header">
+                    <h4 class="mb-0">
+                        <i class="bi bi-info-circle text-info"></i> System Information
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="list-group list-group-flush">
+                        <div class="list-group-item bg-transparent border-secondary d-flex justify-content-between">
+                            <span><i class="bi bi-calendar text-primary"></i> Last Galaxy Sync</span>
+                            <span class="text-muted">
+                                {% if stats.last_backup %}
+                                    {{ stats.last_backup }}
+                                {% else %}
+                                    Never
+                                {% endif %}
+                            </span>
+                        </div>
+                        
+                        <div class="list-group-item bg-transparent border-secondary d-flex justify-content-between">
+                            <span><i class="bi bi-file-earmark-text text-success"></i> Database Status</span>
+                            <span class="badge bg-success">Active</span>
+                        </div>
+                        
+                        <div class="list-group-item bg-transparent border-secondary d-flex justify-content-between">
+                            <span><i class="bi bi-graph-up text-warning"></i> Collection Growth</span>
+                            <span class="text-muted">{{ stats.total_games }} games</span>
+                        </div>
+                        
+                        <div class="list-group-item bg-transparent border-secondary d-flex justify-content-between">
+                            <span><i class="bi bi-speedometer2 text-info"></i> Completion Rate</span>
+                            <span class="badge bg-info">{{ "%.1f"|format(stats.completion_percentage) }}%</span>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4 text-center">
+                        <button class="btn btn-outline-primary" onclick="refreshGalaxy()">
+                            <i class="bi bi-arrow-repeat"></i> Refresh from Galaxy
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <h4 class="mb-3">
+                        <i class="bi bi-lightning"></i> Quick Actions
+                    </h4>
+                    <div class="d-flex flex-wrap justify-content-center gap-3">
+                        <a href="{{ url_for('random_game') }}" class="btn btn-light">
+                            <i class="bi bi-shuffle"></i> Pick Random Game
+                        </a>
+                        <a href="{{ url_for('search') }}" class="btn btn-light">
+                            <i class="bi bi-search"></i> Search Collection
+                        </a>
+                        <a href="{{ url_for('index') }}" class="btn btn-outline-light">
+                            <i class="bi bi-house"></i> Back to Dashboard
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

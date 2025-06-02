@@ -1,0 +1,326 @@
+/* Custom CSS for Game Manager Web Interface */
+
+/* Custom gradient backgrounds */
+.bg-gradient-primary {
+    background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+}
+
+.bg-gradient-success {
+    background: linear-gradient(135deg, #198754 0%, #146c43 100%);
+}
+
+.bg-gradient-warning {
+    background: linear-gradient(135deg, #ffc107 0%, #ffb300 100%);
+}
+
+.bg-gradient-info {
+    background: linear-gradient(135deg, #0dcaf0 0%, #17a2b8 100%);
+}
+
+/* Custom card styling with improved contrast */
+.card {
+    border: 0;
+    border-radius: 15px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+}
+
+/* Game image styling */
+.game-image-container {
+    position: relative;
+    height: 300px;
+    overflow: hidden;
+}
+
+.game-cover {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+
+.game-cover:hover {
+    transform: scale(1.05);
+}
+
+.game-image-placeholder {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+    display: none;
+}
+
+/* Detail items styling */
+.detail-item {
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.detail-item:last-child {
+    border-bottom: none;
+}
+
+.detail-item i {
+    width: 20px;
+    margin-right: 8px;
+}
+
+/* Custom progress bars */
+.progress {
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.progress-bar {
+    border-radius: 10px;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* Animation classes */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-in-up {
+    animation: fadeInUp 0.6s ease-out;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+.pulse {
+    animation: pulse 2s infinite;
+}
+
+/* Custom button styling */
+.btn {
+    border-radius: 10px;
+    font-weight: 500;
+    padding: 10px 20px;
+    transition: all 0.3s ease;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.btn-lg {
+    padding: 15px 30px;
+    font-size: 1.1rem;
+}
+
+/* Loading spinner styling */
+.spinner-border {
+    width: 3rem;
+    height: 3rem;
+}
+
+/* Custom navbar styling */
+.navbar {
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.navbar-brand {
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+/* Custom badge styling */
+.badge {
+    border-radius: 8px;
+    font-weight: 500;
+    padding: 8px 12px;
+}
+
+/* Search form styling */
+.input-group-lg .form-control {
+    border-radius: 0;
+    border: 0;
+    font-size: 1.1rem;
+    padding: 15px 20px;
+}
+
+.input-group-lg .btn {
+    border-radius: 0;
+    padding: 15px 25px;
+}
+
+.input-group-lg .input-group-text {
+    border-radius: 10px 0 0 10px;
+    border: 0;
+    padding: 15px 20px;
+}
+
+.input-group-lg .btn:last-child {
+    border-radius: 0 10px 10px 0;
+}
+
+/* Stats page specific styling */
+.list-group-item {
+    padding: 15px 20px;
+    border-radius: 8px !important;
+    margin-bottom: 5px;
+}
+
+/* Game card animations */
+.game-actions .btn {
+    margin: 5px;
+    transition: all 0.3s ease;
+}
+
+.game-actions .btn:hover {
+    transform: scale(1.05);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .display-4 {
+        font-size: 2rem;
+    }
+    
+    .display-3 {
+        font-size: 1.5rem;
+    }
+    
+    .game-image-container {
+        height: 200px;
+    }
+    
+    .btn-lg {
+        padding: 12px 24px;
+        font-size: 1rem;
+    }
+    
+    .card-body {
+        padding: 1rem;
+    }
+}
+
+/* Improved dark theme with better contrast */
+.bg-dark {
+    background-color: #1a1a1a !important;
+}
+
+.bg-secondary {
+    background-color: #3a3a3a !important; /* Lighter than before for better contrast */
+    color: #ffffff !important;
+}
+
+.text-muted {
+    color: #b8b8b8 !important; /* Lighter muted text for better readability */
+}
+
+.border-secondary {
+    border-color: #555 !important; /* Lighter borders */
+}
+
+/* Card text improvements */
+.card .text-muted {
+    color: #cccccc !important; /* Much lighter for better readability */
+}
+
+.card-text {
+    color: #e0e0e0 !important; /* Lighter main text */
+}
+
+.card-title {
+    color: #ffffff !important; /* Ensure titles are white */
+}
+
+/* Form control improvements */
+.form-control {
+    background-color: #4a4a4a !important;
+    border-color: #666 !important;
+    color: #ffffff !important;
+}
+
+.form-control:focus {
+    background-color: #5a5a5a !important;
+    border-color: #0d6efd !important;
+    color: #ffffff !important;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25) !important;
+}
+
+.form-select {
+    background-color: #4a4a4a !important;
+    border-color: #666 !important;
+    color: #ffffff !important;
+}
+
+.form-select:focus {
+    background-color: #5a5a5a !important;
+    border-color: #0d6efd !important;
+    color: #ffffff !important;
+}
+
+/* Toast styling */
+.toast {
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* Alert improvements */
+.alert {
+    border-radius: 10px;
+}
+
+.alert-info {
+    background-color: #4a4a4a !important;
+    border-color: #0dcaf0 !important;
+    color: #ffffff !important;
+}
+
+.alert-warning {
+    background-color: #4a4a4a !important;
+    border-color: #ffc107 !important;
+    color: #ffffff !important;
+}
+
+/* Smooth transitions for all elements */
+* {
+    transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #2d2d2d;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #0d6efd;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #0a58ca;
+} 
