@@ -276,6 +276,7 @@ function createGameCard(game) {
     const personalRating = game.myRating || '';
     const criticScore = game.criticsScore || '';
     const isPlayed = game.is_played;
+    const isFavorite = game.is_favorite;
     
     const personalRatingDisplay = personalRating ? 
         `<span class="badge bg-success">${personalRating}/100</span>` : 
@@ -289,6 +290,9 @@ function createGameCard(game) {
         `<span class="badge bg-success"><i class="bi bi-check-circle"></i> COMPLETED</span>` :
         `<span class="badge bg-warning text-dark"><i class="bi bi-hourglass-split"></i> UNPLAYED</span>`;
     
+    const favoriteBadge = isFavorite ?
+        `<span class="badge bg-warning text-dark"><i class="bi bi-star-fill"></i> FAVORITE</span>` : '';
+    
     const summary = game.summary ? 
         (game.summary.length > 120 ? game.summary.substring(0, 120) + '...' : game.summary) :
         'No description available.';
@@ -298,7 +302,10 @@ function createGameCard(game) {
             <div class="card bg-secondary h-100">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-start mb-2">
-                        ${statusBadge}
+                        <div class="d-flex flex-wrap gap-1">
+                            ${statusBadge}
+                            ${favoriteBadge}
+                        </div>
                     </div>
                     
                     <h5 class="card-title text-primary mb-3">${escapeHtml(game.title || 'Unknown Title')}</h5>
@@ -356,13 +363,24 @@ function createGameCard(game) {
                     
                     <p class="card-text small text-muted mb-3">${escapeHtml(summary)}</p>
                     
-                    <div class="d-flex gap-2">
+                    <div class="d-flex gap-2 mb-2">
                         ${isPlayed ? 
                             `<button class="btn btn-warning btn-sm flex-fill" onclick="markAsUnplayed('${escapeHtml(game.title || '')}', this)">
                                 <i class="bi bi-arrow-counterclockwise"></i> Mark Unplayed
                             </button>` :
                             `<button class="btn btn-success btn-sm flex-fill" onclick="markAsPlayed('${escapeHtml(game.title || '')}', this)">
                                 <i class="bi bi-check-circle"></i> Mark Played
+                            </button>`
+                        }
+                    </div>
+                    
+                    <div class="d-flex gap-2">
+                        ${isFavorite ? 
+                            `<button class="btn btn-outline-danger btn-sm flex-fill" onclick="markAsUnfavorite('${escapeHtml(game.title || '')}', this)">
+                                <i class="bi bi-star"></i> Remove Favorite
+                            </button>` :
+                            `<button class="btn btn-outline-warning btn-sm flex-fill" onclick="markAsFavorite('${escapeHtml(game.title || '')}', this)">
+                                <i class="bi bi-star-fill"></i> Add Favorite
                             </button>`
                         }
                     </div>
@@ -570,6 +588,93 @@ function updateGameRatingInArrays(gameTitle, rating) {
         const game = gameArray.find(g => (g.title || '').toLowerCase() === gameTitle.toLowerCase());
         if (game) {
             game.myRating = rating.toString();
+        }
+    });
+}
+
+function markAsFavorite(gameTitle, button) {
+    if (!gameTitle) return;
+    
+    button.disabled = true;
+    button.innerHTML = '<i class="bi bi-clock"></i> Adding...';
+    
+    fetch('/api/mark-favorite', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            title: gameTitle
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast(data.message, 'success');
+            
+            // Update the game's favorite status in our data
+            updateGameFavoriteStatus(gameTitle, true);
+            
+            // Refresh the display
+            displayGames();
+            updateStatistics();
+        } else {
+            showToast(data.message, 'error');
+            button.disabled = false;
+            button.innerHTML = '<i class="bi bi-star-fill"></i> Add Favorite';
+        }
+    })
+    .catch(error => {
+        showToast('Error adding to favorites: ' + error.message, 'error');
+        button.disabled = false;
+        button.innerHTML = '<i class="bi bi-star-fill"></i> Add Favorite';
+    });
+}
+
+function markAsUnfavorite(gameTitle, button) {
+    if (!gameTitle) return;
+    
+    button.disabled = true;
+    button.innerHTML = '<i class="bi bi-clock"></i> Removing...';
+    
+    fetch('/api/mark-unfavorite', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            title: gameTitle
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast(data.message, 'success');
+            
+            // Update the game's favorite status in our data
+            updateGameFavoriteStatus(gameTitle, false);
+            
+            // Refresh the display
+            displayGames();
+            updateStatistics();
+        } else {
+            showToast(data.message, 'error');
+            button.disabled = false;
+            button.innerHTML = '<i class="bi bi-star"></i> Remove Favorite';
+        }
+    })
+    .catch(error => {
+        showToast('Error removing from favorites: ' + error.message, 'error');
+        button.disabled = false;
+        button.innerHTML = '<i class="bi bi-star"></i> Remove Favorite';
+    });
+}
+
+function updateGameFavoriteStatus(gameTitle, isFavorite) {
+    [allGames, filteredGames].forEach(gameArray => {
+        const game = gameArray.find(g => (g.title || '').toLowerCase() === gameTitle.toLowerCase());
+        if (game) {
+            game.is_favorite = isFavorite;
         }
     });
 }

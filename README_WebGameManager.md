@@ -6,7 +6,7 @@ A beautiful web-based interface for managing your GOG Galaxy game collection!
 
 ### 🎯 **Dashboard**
 - Beautiful overview of your entire collection
-- Statistics cards with total, played, and unplayed games
+- Statistics cards with total, played, unplayed, and favorite games
 - Animated progress bars showing completion percentage
 - Top genres and platforms visualization
 - Quick action buttons
@@ -18,16 +18,24 @@ A beautiful web-based interface for managing your GOG Galaxy game collection!
 - Automatic counter of remaining unplayed games
 - Beautiful game imagery and metadata display
 
+### ⭐ **Favorites Management**
+- Mark your favorite games with a single click
+- Dedicated favorites page with filtering and sorting
+- View favorite games alongside played/unplayed status
+- Remove games from favorites easily
+- Track when games were added to favorites
+
 ### 🔍 **Smart Search**
 - Search across titles, genres, platforms, and developers
 - Real-time results with played/unplayed status indicators
-- Mark games as played from search results
+- Mark games as played or add to favorites from search results
 - Responsive card-based layout
 
 ### 📊 **Detailed Statistics**
 - Comprehensive collection analytics
 - Genre and platform distribution charts
 - Completion analysis with progress tracking
+- Favorites tracking and statistics
 - Achievement-style progress indicators
 - System information and sync status
 
@@ -35,7 +43,7 @@ A beautiful web-based interface for managing your GOG Galaxy game collection!
 - One-click sync with GOG Galaxy
 - Automatic backup creation during sync
 - Real-time sync status notifications
-- Preserves played game history across syncs
+- Preserves played game history and favorites across syncs
 
 ## 🚀 Getting Started
 
@@ -77,11 +85,19 @@ python web_game_manager.py
 - Click "Mark as Played" to add to your completed list
 - Click "Pick Another" to get a different random selection
 
+### **Favorites Management**
+- Click the star button on any game to add it to favorites
+- Visit the "Favorites" page to view all your favorite games
+- Filter and sort favorites by title, genre, platform, or added date
+- Remove games from favorites using the "Remove Favorite" button
+- Track both played and unplayed favorites
+
 ### **Search**
 - Type any keyword to search your collection
 - Search works across all game metadata
 - See [PLAYED] or [UNPLAYED] status for each game
 - Mark unplayed games as completed directly from results
+- Add or remove games from favorites from search results
 
 ### **Statistics**
 - View detailed collection analytics

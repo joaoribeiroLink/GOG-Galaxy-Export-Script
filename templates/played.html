@@ -26,6 +26,16 @@
         </div>
         
         <div class="col-md-3">
+            <div class="card bg-gradient-warning text-white text-center">
+                <div class="card-body">
+                    <i class="bi bi-star-fill display-4 mb-2"></i>
+                    <h3 id="favorite-count">-</h3>
+                    <p class="mb-0">Favorite Played</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
             <div class="card bg-gradient-info text-white text-center">
                 <div class="card-body">
                     <i class="bi bi-calendar-check display-4 mb-2"></i>
@@ -36,7 +46,7 @@
         </div>
         
         <div class="col-md-3">
-            <div class="card bg-gradient-warning text-white text-center">
+            <div class="card bg-gradient-primary text-white text-center">
                 <div class="card-body">
                     <i class="bi bi-star-fill display-4 mb-2"></i>
                     <h3 id="average-rating">-</h3>
@@ -44,25 +54,15 @@
                 </div>
             </div>
         </div>
-        
-        <div class="col-md-3">
-            <div class="card bg-gradient-primary text-white text-center">
-                <div class="card-body">
-                    <i class="bi bi-percent display-4 mb-2"></i>
-                    <h3 id="completion-rate">Loading...</h3>
-                    <p class="mb-0">Completion Rate</p>
-                </div>
-            </div>
-        </div>
     </div>
 
     <!-- Filter and Sort Controls -->
     <div class="row mb-4">
-        <div class="col-lg-8 mx-auto">
+        <div class="col-lg-10 mx-auto">
             <div class="card bg-secondary">
                 <div class="card-body">
                     <div class="row g-3">
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <div class="input-group">
                                 <span class="input-group-text bg-primary text-white">
                                     <i class="bi bi-search"></i>
@@ -72,23 +72,47 @@
                             </div>
                         </div>
                         <div class="col-md-3">
+                            <select id="status-filter" class="form-select" onchange="filterGames()">
+                                <option value="all">All Played</option>
+                                <option value="favorites">Favorites Only</option>
+                                <option value="non-favorites">Non-Favorites Only</option>
+                                <option value="rated">Rated Only</option>
+                                <option value="unrated">Unrated Only</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
                             <select id="sort-select" class="form-select" onchange="sortGames()">
                                 <option value="recent">Recently Played</option>
                                 <option value="title">Game Title (A-Z)</option>
                                 <option value="platform">Platform</option>
                                 <option value="genre">Genre</option>
+                                <option value="favorites-first">Favorites First</option>
                                 <option value="rating-high">Highest Rated</option>
                                 <option value="rating-low">Lowest Rated</option>
                                 <option value="unrated">Unrated Games</option>
                             </select>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <button class="btn btn-outline-primary w-100" onclick="loadPlayedGames()">
                                 <i class="bi bi-arrow-repeat"></i> Refresh
                             </button>
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="row mb-4">
+        <div class="col-12 text-center">
+            <div class="btn-group" role="group">
+                <button type="button" class="btn btn-success" onclick="pickRandomPlayed()">
+                    <i class="bi bi-shuffle"></i> Pick Random Played
+                </button>
+                <button type="button" class="btn btn-outline-warning" onclick="pickRandomFavoritePlayed()">
+                    <i class="bi bi-star-fill"></i> Pick Random Favorite
+                </button>
             </div>
         </div>
     </div>
@@ -133,7 +157,6 @@ let filteredGames = [];
 // Load played games when page loads
 document.addEventListener('DOMContentLoaded', function() {
     loadPlayedGames();
-    loadStats();
 });
 
 function loadPlayedGames() {
@@ -148,36 +171,17 @@ function loadPlayedGames() {
     fetch('/api/played-games')
         .then(response => response.json())
         .then(data => {
-            loading.style.display = 'none';
-            
             if (data.success && data.games.length > 0) {
                 allPlayedGames = data.games;
-                filteredGames = [...allPlayedGames];
                 
-                // Update played count
-                document.getElementById('played-count').textContent = data.games.length;
-                
-                // Find most recent game
-                const mostRecent = findMostRecentGame(data.games);
-                document.getElementById('recent-played').textContent = mostRecent || 'None';
-                
-                // Calculate average rating
-                const ratings = data.games
-                    .map(game => parseInt(game.myRating || '0'))
-                    .filter(rating => rating > 0);
-                
-                if (ratings.length > 0) {
-                    const avgRating = (ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length).toFixed(1);
-                    document.getElementById('average-rating').textContent = avgRating;
-                } else {
-                    document.getElementById('average-rating').textContent = 'No Ratings';
-                }
-                
-                sortGames();
-                container.style.display = 'block';
+                // Load favorite status for played games
+                loadFavoriteStatus();
             } else {
+                loading.style.display = 'none';
                 noGames.style.display = 'block';
                 document.getElementById('played-count').textContent = '0';
+                document.getElementById('favorite-count').textContent = '0';
+                document.getElementById('recent-played').textContent = '-';
                 document.getElementById('average-rating').textContent = '-';
             }
         })
@@ -187,16 +191,74 @@ function loadPlayedGames() {
         });
 }
 
-function loadStats() {
-    // Load completion rate from the stats API (reusing from dashboard)
-    fetch('/api/played-games')
+function loadFavoriteStatus() {
+    // Get favorite games to mark which played games are favorites
+    fetch('/api/favorite-games')
         .then(response => response.json())
         .then(data => {
-            // Get total games count from somewhere - we'll make a simple estimation
-            // In a real scenario, you'd want to call a separate stats endpoint
-            const playedCount = data.games ? data.games.length : 0;
-            document.getElementById('completion-rate').textContent = playedCount > 0 ? 'Loaded' : '0%';
+            const loading = document.getElementById('loading');
+            const container = document.getElementById('played-games-container');
+            
+            if (data.success) {
+                const favoriteTitles = new Set(data.games.map(game => game.title.toLowerCase()));
+                
+                // Add favorite status to played games
+                allPlayedGames.forEach(game => {
+                    game.is_favorite = favoriteTitles.has(game.title.toLowerCase());
+                });
+                
+                filteredGames = [...allPlayedGames];
+                updateStatistics();
+                sortGames();
+                container.style.display = 'block';
+            } else {
+                // Even if favorites loading fails, show the played games
+                filteredGames = [...allPlayedGames];
+                updateStatistics();
+                sortGames();
+                container.style.display = 'block';
+            }
+            
+            loading.style.display = 'none';
+        })
+        .catch(error => {
+            // Even if favorites loading fails, show the played games
+            const loading = document.getElementById('loading');
+            const container = document.getElementById('played-games-container');
+            
+            filteredGames = [...allPlayedGames];
+            updateStatistics();
+            sortGames();
+            container.style.display = 'block';
+            loading.style.display = 'none';
+            
+            console.log('Could not load favorite status:', error);
         });
+}
+
+function updateStatistics() {
+    const total = allPlayedGames.length;
+    const favorites = allPlayedGames.filter(game => game.is_favorite).length;
+    
+    // Update played count
+    document.getElementById('played-count').textContent = total;
+    document.getElementById('favorite-count').textContent = favorites;
+    
+    // Find most recent game
+    const mostRecent = findMostRecentGame(allPlayedGames);
+    document.getElementById('recent-played').textContent = mostRecent || 'None';
+    
+    // Calculate average rating
+    const ratings = allPlayedGames
+        .map(game => parseInt(game.myRating || '0'))
+        .filter(rating => rating > 0);
+    
+    if (ratings.length > 0) {
+        const avgRating = (ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length).toFixed(1);
+        document.getElementById('average-rating').textContent = avgRating;
+    } else {
+        document.getElementById('average-rating').textContent = 'No Ratings';
+    }
 }
 
 function findMostRecentGame(games) {
@@ -214,15 +276,32 @@ function findMostRecentGame(games) {
 
 function filterGames() {
     const filterText = document.getElementById('filter-input').value.toLowerCase();
+    const statusFilter = document.getElementById('status-filter').value;
     
-    if (!filterText) {
-        filteredGames = [...allPlayedGames];
-    } else {
-        filteredGames = allPlayedGames.filter(game => {
-            const searchText = `${game.title || ''} ${game.genres || ''} ${game.platformList || ''} ${game.developers || ''}`.toLowerCase();
-            return searchText.includes(filterText);
-        });
-    }
+    filteredGames = allPlayedGames.filter(game => {
+        // Text filter
+        const searchText = `${game.title || ''} ${game.genres || ''} ${game.platformList || ''} ${game.developers || ''}`.toLowerCase();
+        const matchesText = !filterText || searchText.includes(filterText);
+        
+        // Status filter
+        let matchesStatus = true;
+        switch (statusFilter) {
+            case 'favorites':
+                matchesStatus = game.is_favorite;
+                break;
+            case 'non-favorites':
+                matchesStatus = !game.is_favorite;
+                break;
+            case 'rated':
+                matchesStatus = game.myRating && game.myRating.trim();
+                break;
+            case 'unrated':
+                matchesStatus = !game.myRating || !game.myRating.trim();
+                break;
+        }
+        
+        return matchesText && matchesStatus;
+    });
     
     displayGames();
 }
@@ -240,10 +319,14 @@ function sortGames() {
                 return (a.platformList || '').localeCompare(b.platformList || '');
             case 'genre':
                 return (a.genres || '').localeCompare(b.genres || '');
+            case 'favorites-first':
+                if (a.is_favorite && !b.is_favorite) return -1;
+                if (!a.is_favorite && b.is_favorite) return 1;
+                return (a.title || '').localeCompare(b.title || '');
             case 'rating-high':
-                return (b.myRating || '0') - (a.myRating || '0');
+                return (parseInt(b.myRating || '0')) - (parseInt(a.myRating || '0'));
             case 'rating-low':
-                return (a.myRating || '0') - (b.myRating || '0');
+                return (parseInt(a.myRating || '0')) - (parseInt(b.myRating || '0'));
             case 'unrated':
                 return (a.myRating ? 0 : 1) - (b.myRating ? 0 : 1);
             default:
@@ -264,7 +347,7 @@ function displayGames() {
                     <div class="card-body">
                         <i class="bi bi-search display-2 mb-3"></i>
                         <h3>No games match your filter</h3>
-                        <p class="mb-0">Try adjusting your search terms.</p>
+                        <p class="mb-0">Try adjusting your search terms or filters.</p>
                     </div>
                 </div>
             </div>
@@ -296,6 +379,7 @@ function createGameCard(game) {
     // Format ratings
     const personalRating = game.myRating || '';
     const criticScore = game.criticsScore || '';
+    const isFavorite = game.is_favorite;
     
     const personalRatingDisplay = personalRating ? 
         `<span class="badge bg-success">${personalRating}/100</span>` : 
@@ -305,14 +389,20 @@ function createGameCard(game) {
         `<span class="badge bg-info">${criticScore}/100</span>` : 
         `<span class="badge bg-secondary">No Score</span>`;
     
+    const favoriteBadge = isFavorite ?
+        `<span class="badge bg-warning text-dark"><i class="bi bi-star-fill"></i> FAVORITE</span>` : '';
+    
     return `
         <div class="col-lg-6 col-xl-4">
             <div class="card bg-secondary h-100">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-start mb-2">
-                        <span class="badge bg-success">
-                            <i class="bi bi-check-circle"></i> COMPLETED
-                        </span>
+                        <div class="d-flex flex-wrap gap-1">
+                            <span class="badge bg-success">
+                                <i class="bi bi-check-circle"></i> COMPLETED
+                            </span>
+                            ${favoriteBadge}
+                        </div>
                         <small class="text-muted">${playedDate}</small>
                     </div>
                     
@@ -371,15 +461,68 @@ function createGameCard(game) {
                     
                     <p class="card-text small text-muted mb-3">${escapeHtml(summary)}</p>
                     
-                    <div class="d-flex gap-2">
+                    <div class="d-flex gap-2 mb-2">
                         <button class="btn btn-warning btn-sm flex-fill" onclick="markAsUnplayed('${escapeHtml(game.title || '')}', this)">
                             <i class="bi bi-arrow-counterclockwise"></i> Mark as Unplayed
                         </button>
+                    </div>
+                    
+                    <div class="d-flex gap-2">
+                        ${isFavorite ? 
+                            `<button class="btn btn-outline-danger btn-sm flex-fill" onclick="markAsUnfavorite('${escapeHtml(game.title || '')}', this)">
+                                <i class="bi bi-star"></i> Remove Favorite
+                            </button>` :
+                            `<button class="btn btn-outline-warning btn-sm flex-fill" onclick="markAsFavorite('${escapeHtml(game.title || '')}', this)">
+                                <i class="bi bi-star-fill"></i> Add Favorite
+                            </button>`
+                        }
                     </div>
                 </div>
             </div>
         </div>
     `;
+}
+
+function pickRandomPlayed() {
+    if (filteredGames.length === 0) {
+        showToast('No played games available!', 'warning');
+        return;
+    }
+    
+    const randomGame = filteredGames[Math.floor(Math.random() * filteredGames.length)];
+    showToast(`Random played game: ${randomGame.title}`, 'info');
+    
+    // Scroll to the game card
+    scrollToGameCard(randomGame.title);
+}
+
+function pickRandomFavoritePlayed() {
+    const favoriteGames = filteredGames.filter(game => game.is_favorite);
+    
+    if (favoriteGames.length === 0) {
+        showToast('No favorite played games available!', 'warning');
+        return;
+    }
+    
+    const randomGame = favoriteGames[Math.floor(Math.random() * favoriteGames.length)];
+    showToast(`Random favorite played game: ${randomGame.title}`, 'info');
+    
+    // Scroll to the game card
+    scrollToGameCard(randomGame.title);
+}
+
+function scrollToGameCard(gameTitle) {
+    const gameCards = document.querySelectorAll('.card');
+    gameCards.forEach(card => {
+        const titleElement = card.querySelector('.card-title');
+        if (titleElement && titleElement.textContent.trim() === gameTitle) {
+            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            card.style.animation = 'pulse 2s';
+            setTimeout(() => {
+                card.style.animation = '';
+            }, 2000);
+        }
+    });
 }
 
 function markAsUnplayed(gameTitle, button) {
@@ -420,8 +563,8 @@ function markAsUnplayed(gameTitle, button) {
                     (game.title || '').toLowerCase() !== gameTitle.toLowerCase()
                 );
                 
-                // Update count
-                document.getElementById('played-count').textContent = allPlayedGames.length;
+                // Update statistics
+                updateStatistics();
                 
                 // Refresh display
                 if (allPlayedGames.length === 0) {
@@ -429,10 +572,6 @@ function markAsUnplayed(gameTitle, button) {
                     document.getElementById('played-games-container').style.display = 'none';
                 } else {
                     displayGames();
-                    
-                    // Update most recent
-                    const mostRecent = findMostRecentGame(allPlayedGames);
-                    document.getElementById('recent-played').textContent = mostRecent || 'None';
                 }
             }, 500);
         } else {
@@ -448,10 +587,91 @@ function markAsUnplayed(gameTitle, button) {
     });
 }
 
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+function markAsFavorite(gameTitle, button) {
+    if (!gameTitle) return;
+    
+    button.disabled = true;
+    button.innerHTML = '<i class="bi bi-clock"></i> Adding...';
+    
+    fetch('/api/mark-favorite', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            title: gameTitle
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast(data.message, 'success');
+            
+            // Update the game's favorite status in our data
+            updateGameFavoriteStatus(gameTitle, true);
+            
+            // Update statistics and refresh display
+            updateStatistics();
+            displayGames();
+        } else {
+            showToast(data.message, 'error');
+            button.disabled = false;
+            button.innerHTML = '<i class="bi bi-star-fill"></i> Add Favorite';
+        }
+    })
+    .catch(error => {
+        showToast('Error adding to favorites: ' + error.message, 'error');
+        button.disabled = false;
+        button.innerHTML = '<i class="bi bi-star-fill"></i> Add Favorite';
+    });
+}
+
+function markAsUnfavorite(gameTitle, button) {
+    if (!gameTitle) return;
+    
+    button.disabled = true;
+    button.innerHTML = '<i class="bi bi-clock"></i> Removing...';
+    
+    fetch('/api/mark-unfavorite', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            title: gameTitle
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast(data.message, 'success');
+            
+            // Update the game's favorite status in our data
+            updateGameFavoriteStatus(gameTitle, false);
+            
+            // Update statistics and refresh display
+            updateStatistics();
+            displayGames();
+        } else {
+            showToast(data.message, 'error');
+            button.disabled = false;
+            button.innerHTML = '<i class="bi bi-star"></i> Remove Favorite';
+        }
+    })
+    .catch(error => {
+        showToast('Error removing from favorites: ' + error.message, 'error');
+        button.disabled = false;
+        button.innerHTML = '<i class="bi bi-star"></i> Remove Favorite';
+    });
+}
+
+function updateGameFavoriteStatus(gameTitle, isFavorite) {
+    [allPlayedGames, filteredGames].forEach(gameArray => {
+        const game = gameArray.find(g => (g.title || '').toLowerCase() === gameTitle.toLowerCase());
+        if (game) {
+            game.is_favorite = isFavorite;
+        }
+    });
 }
 
 function rateGameFromList(gameTitle, button) {
@@ -493,6 +713,7 @@ function rateGameFromList(gameTitle, button) {
             
             // Update the game data in our arrays
             updateGameRatingInArrays(gameTitle, rating);
+            updateStatistics(); // Update average rating
         } else {
             showToast(data.message, 'error');
         }
@@ -539,6 +760,7 @@ function clearGameRating(gameTitle, button) {
             
             // Update the game data in our arrays
             updateGameRatingInArrays(gameTitle, '');
+            updateStatistics(); // Update average rating
         } else {
             showToast(data.message, 'error');
         }
@@ -560,12 +782,23 @@ function updateGameRatingInArrays(gameTitle, rating) {
     });
 }
 
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 // Add fade out animation CSS
 const style = document.createElement('style');
 style.textContent = `
     @keyframes fadeOut {
         from { opacity: 1; transform: translateY(0); }
         to { opacity: 0; transform: translateY(-20px); }
+    }
+    @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+        100% { transform: scale(1); }
     }
 `;
 document.head.appendChild(style);

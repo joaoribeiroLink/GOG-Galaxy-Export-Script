@@ -68,6 +68,19 @@
     <!-- Rating Statistics -->
     <div class="row g-4 mb-5">
         <div class="col-md-3">
+            <a href="{{ url_for('favorites') }}" class="text-decoration-none">
+                <div class="card bg-gradient-warning text-white h-100 card-hover">
+                    <div class="card-body text-center">
+                        <i class="bi bi-star-fill display-3 mb-3"></i>
+                        <h2 class="card-title">{{ stats.favorite_games }}</h2>
+                        <p class="card-text">Favorite Games</p>
+                        <small class="text-white-50">Click to view favorites</small>
+                    </div>
+                </div>
+            </a>
+        </div>
+        
+        <div class="col-md-3">
             <div class="card bg-secondary text-white h-100">
                 <div class="card-body text-center">
                     <i class="bi bi-star-fill display-3 mb-3 text-warning"></i>

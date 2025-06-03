@@ -5,6 +5,7 @@ Features:
 - Web-based interface with modern design
 - All the same functionality as the command-line version
 - Random game picker, statistics, search, and Galaxy sync
+- Favorites management
 """
 
 from flask import Flask, render_template, request, jsonify, redirect, url_for
@@ -20,10 +21,11 @@ import shutil
 app = Flask(__name__)
 
 class WebGameManager:
-    def __init__(self, game_db_file="gameDB.csv", played_file="Played_game.csv", backup_file="gameDB_backup.csv"):
+    def __init__(self, game_db_file="gameDB.csv", played_file="Played_game.csv", backup_file="gameDB_backup.csv", favorites_file="Favorite_games.csv"):
         self.game_db_file = game_db_file
         self.played_file = played_file
         self.backup_file = backup_file
+        self.favorites_file = favorites_file
         self.headers = []
         self.load_headers()
         
@@ -69,6 +71,21 @@ class WebGameManager:
             except Exception as e:
                 pass
         return played_titles
+
+    def get_favorite_game_titles(self):
+        """Get a set of titles of games that have been marked as favorites"""
+        favorite_titles = set()
+        if os.path.exists(self.favorites_file):
+            try:
+                with open(self.favorites_file, 'r', encoding='utf-8') as file:
+                    reader = csv.DictReader(file, delimiter='\t')
+                    for row in reader:
+                        title = row.get('title', '').strip().lower()
+                        if title:
+                            favorite_titles.add(title)
+            except Exception as e:
+                pass
+        return favorite_titles
     
     def get_played_games(self):
         """Get all games that have been played with their metadata"""
@@ -82,6 +99,19 @@ class WebGameManager:
             except Exception as e:
                 pass
         return played_games
+
+    def get_favorite_games(self):
+        """Get all games that have been marked as favorites with their metadata"""
+        favorite_games = []
+        if os.path.exists(self.favorites_file):
+            try:
+                with open(self.favorites_file, 'r', encoding='utf-8') as file:
+                    reader = csv.DictReader(file, delimiter='\t')
+                    for row in reader:
+                        favorite_games.append(row)
+            except Exception as e:
+                pass
+        return favorite_games
     
     def get_unplayed_games(self):
         """Get all games that haven't been played yet"""
@@ -100,26 +130,64 @@ class WebGameManager:
         """Add a game to the played games file"""
         try:
             file_exists = os.path.exists(self.played_file)
-            with open(self.played_file, 'a', encoding='utf-8', newline='') as file:
-                # Add a timestamp for when the game was played
-                game['playedDate'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                
-                if not file_exists:
-                    # Create headers for new file (original headers + playedDate)
-                    played_headers = self.headers + ['playedDate']
+            
+            # Add a timestamp for when the game was played
+            game_copy = game.copy()  # Make a copy to avoid modifying the original
+            game_copy['playedDate'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            
+            if not file_exists:
+                # Create headers for new file (original headers + playedDate)
+                played_headers = self.headers + ['playedDate']
+                with open(self.played_file, 'w', encoding='utf-8', newline='') as file:
                     writer = csv.DictWriter(file, fieldnames=played_headers, delimiter='\t')
                     writer.writeheader()
-                    writer.writerow(game)
-                else:
-                    # Just append the game data
-                    with open(self.played_file, 'r', encoding='utf-8') as read_file:
-                        reader = csv.reader(read_file, delimiter='\t')
-                        existing_headers = next(reader)
-                    
+                    writer.writerow(game_copy)
+            else:
+                # Read existing headers first
+                with open(self.played_file, 'r', encoding='utf-8') as read_file:
+                    reader = csv.reader(read_file, delimiter='\t')
+                    existing_headers = next(reader)
+                
+                # Then append the game data
+                with open(self.played_file, 'a', encoding='utf-8', newline='') as file:
                     writer = csv.DictWriter(file, fieldnames=existing_headers, delimiter='\t')
-                    writer.writerow(game)
+                    writer.writerow(game_copy)
+                    
             return True
         except Exception as e:
+            print(f"Error adding played game: {e}")  # Debug print
+            return False
+
+    def add_favorite_game(self, game):
+        """Add a game to the favorites file"""
+        try:
+            file_exists = os.path.exists(self.favorites_file)
+            
+            # Add a timestamp for when the game was favorited
+            game_copy = game.copy()  # Make a copy to avoid modifying the original
+            game_copy['favoritedDate'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            
+            if not file_exists:
+                # Create headers for new file (original headers + favoritedDate)
+                favorite_headers = self.headers + ['favoritedDate']
+                with open(self.favorites_file, 'w', encoding='utf-8', newline='') as file:
+                    writer = csv.DictWriter(file, fieldnames=favorite_headers, delimiter='\t')
+                    writer.writeheader()
+                    writer.writerow(game_copy)
+            else:
+                # Read existing headers first
+                with open(self.favorites_file, 'r', encoding='utf-8') as read_file:
+                    reader = csv.reader(read_file, delimiter='\t')
+                    existing_headers = next(reader)
+                
+                # Then append the game data
+                with open(self.favorites_file, 'a', encoding='utf-8', newline='') as file:
+                    writer = csv.DictWriter(file, fieldnames=existing_headers, delimiter='\t')
+                    writer.writerow(game_copy)
+                    
+            return True
+        except Exception as e:
+            print(f"Error adding favorite game: {e}")  # Debug print
             return False
     
     def remove_played_game(self, game_title):
@@ -143,6 +211,36 @@ class WebGameManager:
                     writer = csv.DictWriter(file, fieldnames=headers, delimiter='\t')
                     writer.writeheader()
                     writer.writerows(played_games)
+                elif headers:
+                    # If no games left, still write headers
+                    writer = csv.DictWriter(file, fieldnames=headers, delimiter='\t')
+                    writer.writeheader()
+            
+            return True
+        except Exception as e:
+            return False
+
+    def remove_favorite_game(self, game_title):
+        """Remove a game from the favorites file"""
+        if not os.path.exists(self.favorites_file):
+            return False
+        
+        try:
+            # Read all favorite games
+            favorite_games = []
+            with open(self.favorites_file, 'r', encoding='utf-8') as file:
+                reader = csv.DictReader(file, delimiter='\t')
+                headers = reader.fieldnames
+                for row in reader:
+                    if row.get('title', '').strip().lower() != game_title.lower():
+                        favorite_games.append(row)
+            
+            # Rewrite the file without the specified game
+            with open(self.favorites_file, 'w', encoding='utf-8', newline='') as file:
+                if headers and favorite_games:
+                    writer = csv.DictWriter(file, fieldnames=headers, delimiter='\t')
+                    writer.writeheader()
+                    writer.writerows(favorite_games)
                 elif headers:
                     # If no games left, still write headers
                     writer = csv.DictWriter(file, fieldnames=headers, delimiter='\t')
@@ -213,6 +311,7 @@ class WebGameManager:
         """Get collection statistics"""
         all_games = self.read_games()
         played_titles = self.get_played_game_titles()
+        favorite_titles = self.get_favorite_game_titles()
         unplayed_games = self.get_unplayed_games()
         
         # Calculate rating statistics
@@ -242,6 +341,7 @@ class WebGameManager:
         stats = {
             'total_games': len(all_games),
             'played_games': len(played_titles),
+            'favorite_games': len(favorite_titles),
             'unplayed_games': len(unplayed_games),
             'completion_percentage': (len(played_titles) / len(all_games) * 100) if len(all_games) > 0 else 0,
             'last_backup': None,
@@ -285,6 +385,7 @@ class WebGameManager:
         """Search for games in the collection"""
         all_games = self.read_games()
         played_titles = self.get_played_game_titles()
+        favorite_titles = self.get_favorite_game_titles()
         
         matches = []
         search_lower = search_term.lower()
@@ -307,9 +408,10 @@ class WebGameManager:
                 search_lower in summary or
                 search_lower in themes):
                 
-                # Add played status
+                # Add played and favorite status
                 game_title_lower = game.get('title', '').strip().lower()
                 game['is_played'] = game_title_lower in played_titles
+                game['is_favorite'] = game_title_lower in favorite_titles
                 
                 matches.append(game)
         
@@ -369,6 +471,11 @@ def unplayed_games():
     """Unplayed games page"""
     return render_template('unplayed_games.html')
 
+@app.route('/favorites')
+def favorites():
+    """Favorites page"""
+    return render_template('favorites.html')
+
 @app.route('/api/random-game')
 def api_random_game():
     """API endpoint to get a random unplayed game"""
@@ -416,16 +523,34 @@ def api_played_games():
             'message': f'Error loading played games: {str(e)}'
         })
 
+@app.route('/api/favorite-games')
+def api_favorite_games():
+    """API endpoint to get all favorite games"""
+    try:
+        favorite_games = manager.get_favorite_games()
+        return jsonify({
+            'success': True,
+            'games': favorite_games
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Error loading favorite games: {str(e)}'
+        })
+
 @app.route('/api/all-games')
 def api_all_games():
     """API endpoint to get all games"""
     try:
         all_games = manager.read_games()
         played_titles = manager.get_played_game_titles()
+        favorite_titles = manager.get_favorite_game_titles()
         
-        # Add played status to each game
+        # Add played and favorite status to each game
         for game in all_games:
-            game['is_played'] = game.get('title', '') in played_titles
+            game_title_lower = game.get('title', '').strip().lower()
+            game['is_played'] = game_title_lower in played_titles
+            game['is_favorite'] = game_title_lower in favorite_titles
             
         return jsonify({
             'success': True,
@@ -485,6 +610,62 @@ def api_mark_unplayed():
         return jsonify({'success': True, 'message': f'{game_title} marked as unplayed!'})
     else:
         return jsonify({'success': False, 'message': 'Failed to mark game as unplayed'})
+
+@app.route('/api/mark-favorite', methods=['POST'])
+def api_mark_favorite():
+    """API endpoint to mark a game as favorite"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': 'No data provided'})
+            
+        game_title = data.get('title')
+        if not game_title:
+            return jsonify({'success': False, 'message': 'Game title is required'})
+        
+        print(f"Attempting to add '{game_title}' to favorites")  # Debug
+        
+        # Find the game in the database
+        all_games = manager.read_games()
+        target_game = None
+        
+        for game in all_games:
+            if game.get('title', '').strip().lower() == game_title.strip().lower():
+                target_game = game
+                break
+        
+        if not target_game:
+            print(f"Game '{game_title}' not found in database")  # Debug
+            return jsonify({'success': False, 'message': f'Game "{game_title}" not found in database'})
+        
+        # Check if already a favorite
+        favorite_titles = manager.get_favorite_game_titles()
+        if game_title.strip().lower() in favorite_titles:
+            return jsonify({'success': False, 'message': f'{game_title} is already in favorites'})
+        
+        # Try to add to favorites
+        success = manager.add_favorite_game(target_game)
+        if success:
+            print(f"Successfully added '{game_title}' to favorites")  # Debug
+            return jsonify({'success': True, 'message': f'{game_title} added to favorites!'})
+        else:
+            print(f"Failed to add '{game_title}' to favorites")  # Debug
+            return jsonify({'success': False, 'message': 'Failed to add game to favorites - check file permissions'})
+            
+    except Exception as e:
+        print(f"Exception in mark-favorite: {e}")  # Debug
+        return jsonify({'success': False, 'message': f'Server error: {str(e)}'})
+
+@app.route('/api/mark-unfavorite', methods=['POST'])
+def api_mark_unfavorite():
+    """API endpoint to mark a game as unfavorite (remove from favorites list)"""
+    data = request.get_json()
+    game_title = data.get('title')
+    
+    if manager.remove_favorite_game(game_title):
+        return jsonify({'success': True, 'message': f'{game_title} removed from favorites!'})
+    else:
+        return jsonify({'success': False, 'message': 'Failed to remove game from favorites'})
 
 @app.route('/api/search')
 def api_search():

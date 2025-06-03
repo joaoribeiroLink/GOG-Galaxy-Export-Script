@@ -26,6 +26,16 @@
         </div>
         
         <div class="col-md-3">
+            <div class="card bg-gradient-warning text-white text-center">
+                <div class="card-body">
+                    <i class="bi bi-star-fill display-4 mb-2"></i>
+                    <h3 id="favorite-count">-</h3>
+                    <p class="mb-0">Favorite Unplayed</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
             <div class="card bg-gradient-info text-white text-center">
                 <div class="card-body">
                     <i class="bi bi-star-fill display-4 mb-2"></i>
@@ -41,16 +51,6 @@
                     <i class="bi bi-award display-4 mb-2"></i>
                     <h3 id="avg-critic-score">-</h3>
                     <p class="mb-0">Avg Critic Score</p>
-                </div>
-            </div>
-        </div>
-        
-        <div class="col-md-3">
-            <div class="card bg-gradient-primary text-white text-center">
-                <div class="card-body">
-                    <i class="bi bi-shuffle display-4 mb-2"></i>
-                    <h3 id="random-pick">?</h3>
-                    <p class="mb-0">Random Pick</p>
                 </div>
             </div>
         </div>
@@ -74,6 +74,8 @@
                         <div class="col-md-3">
                             <select id="rating-filter" class="form-select" onchange="filterGames()">
                                 <option value="all">All Unplayed</option>
+                                <option value="favorites">Favorites Only</option>
+                                <option value="non-favorites">Non-Favorites Only</option>
                                 <option value="rated">Pre-rated Only</option>
                                 <option value="unrated">Unrated Only</option>
                                 <option value="high-critic">High Critic Score (80+)</option>
@@ -86,6 +88,7 @@
                                 <option value="title-desc">Game Title (Z-A)</option>
                                 <option value="platform">Platform</option>
                                 <option value="genre">Genre</option>
+                                <option value="favorites-first">Favorites First</option>
                                 <option value="rating-high">Highest Rated</option>
                                 <option value="rating-low">Lowest Rated</option>
                                 <option value="critic-high">Highest Critic Score</option>
@@ -109,6 +112,9 @@
             <div class="btn-group" role="group">
                 <button type="button" class="btn btn-warning" onclick="pickRandomGame()">
                     <i class="bi bi-shuffle"></i> Pick Random Game
+                </button>
+                <button type="button" class="btn btn-outline-warning" onclick="pickRandomFavorite()">
+                    <i class="bi bi-star-fill"></i> Pick Random Favorite
                 </button>
                 <a href="{{ url_for('random_game') }}" class="btn btn-outline-warning">
                     <i class="bi bi-dice-1"></i> Random Game Page
@@ -171,18 +177,18 @@ function loadUnplayedGames() {
     fetch('/api/unplayed-games')
         .then(response => response.json())
         .then(data => {
-            loading.style.display = 'none';
-            
             if (data.success && data.games.length > 0) {
                 allUnplayedGames = data.games;
-                filteredGames = [...allUnplayedGames];
                 
-                updateStatistics();
-                sortGames();
-                container.style.display = 'block';
+                // Load favorite status for unplayed games
+                loadFavoriteStatus();
             } else {
+                loading.style.display = 'none';
                 noGames.style.display = 'block';
                 document.getElementById('unplayed-count').textContent = '0';
+                document.getElementById('favorite-count').textContent = '0';
+                document.getElementById('rated-count').textContent = '0';
+                document.getElementById('avg-critic-score').textContent = 'N/A';
             }
         })
         .catch(error => {
@@ -191,8 +197,54 @@ function loadUnplayedGames() {
         });
 }
 
+function loadFavoriteStatus() {
+    // Get favorite games to mark which unplayed games are favorites
+    fetch('/api/favorite-games')
+        .then(response => response.json())
+        .then(data => {
+            const loading = document.getElementById('loading');
+            const container = document.getElementById('games-container');
+            
+            if (data.success) {
+                const favoriteTitles = new Set(data.games.map(game => game.title.toLowerCase()));
+                
+                // Add favorite status to unplayed games
+                allUnplayedGames.forEach(game => {
+                    game.is_favorite = favoriteTitles.has(game.title.toLowerCase());
+                });
+                
+                filteredGames = [...allUnplayedGames];
+                updateStatistics();
+                sortGames();
+                container.style.display = 'block';
+            } else {
+                // Even if favorites loading fails, show the unplayed games
+                filteredGames = [...allUnplayedGames];
+                updateStatistics();
+                sortGames();
+                container.style.display = 'block';
+            }
+            
+            loading.style.display = 'none';
+        })
+        .catch(error => {
+            // Even if favorites loading fails, show the unplayed games
+            const loading = document.getElementById('loading');
+            const container = document.getElementById('games-container');
+            
+            filteredGames = [...allUnplayedGames];
+            updateStatistics();
+            sortGames();
+            container.style.display = 'block';
+            loading.style.display = 'none';
+            
+            console.log('Could not load favorite status:', error);
+        });
+}
+
 function updateStatistics() {
     const total = allUnplayedGames.length;
+    const favorites = allUnplayedGames.filter(game => game.is_favorite).length;
     const rated = allUnplayedGames.filter(game => game.myRating && game.myRating.trim()).length;
     
     // Calculate average critic score
@@ -202,16 +254,9 @@ function updateStatistics() {
         'N/A';
     
     document.getElementById('unplayed-count').textContent = total;
+    document.getElementById('favorite-count').textContent = favorites;
     document.getElementById('rated-count').textContent = rated;
     document.getElementById('avg-critic-score').textContent = avgCriticScore;
-    
-    // Update random pick hint
-    if (total > 0) {
-        const randomIndex = Math.floor(Math.random() * total);
-        const randomGame = allUnplayedGames[randomIndex];
-        document.getElementById('random-pick').textContent = randomGame.title.length > 15 ? 
-            randomGame.title.substring(0, 15) + '...' : randomGame.title;
-    }
 }
 
 function filterGames() {
@@ -226,6 +271,12 @@ function filterGames() {
         // Rating filter
         let matchesRating = true;
         switch (ratingFilter) {
+            case 'favorites':
+                matchesRating = game.is_favorite;
+                break;
+            case 'non-favorites':
+                matchesRating = !game.is_favorite;
+                break;
             case 'rated':
                 matchesRating = game.myRating && game.myRating.trim();
                 break;
@@ -259,6 +310,10 @@ function sortGames() {
                 return (a.platformList || '').localeCompare(b.platformList || '');
             case 'genre':
                 return (a.genres || '').localeCompare(b.genres || '');
+            case 'favorites-first':
+                if (a.is_favorite && !b.is_favorite) return -1;
+                if (!a.is_favorite && b.is_favorite) return 1;
+                return (a.title || '').localeCompare(b.title || '');
             case 'rating-high':
                 return (parseInt(b.myRating || '0')) - (parseInt(a.myRating || '0'));
             case 'rating-low':
@@ -305,6 +360,7 @@ function displayGames() {
 function createGameCard(game) {
     const personalRating = game.myRating || '';
     const criticScore = game.criticsScore || '';
+    const isFavorite = game.is_favorite;
     
     const personalRatingDisplay = personalRating ? 
         `<span class="badge bg-success">${personalRating}/100</span>` : 
@@ -313,6 +369,9 @@ function createGameCard(game) {
     const criticScoreDisplay = criticScore ? 
         `<span class="badge bg-info">${criticScore}/100</span>` : 
         `<span class="badge bg-secondary">No Score</span>`;
+    
+    const favoriteBadge = isFavorite ?
+        `<span class="badge bg-warning text-dark"><i class="bi bi-star-fill"></i> FAVORITE</span>` : '';
     
     const summary = game.summary ? 
         (game.summary.length > 120 ? game.summary.substring(0, 120) + '...' : game.summary) :
@@ -323,9 +382,12 @@ function createGameCard(game) {
             <div class="card bg-secondary h-100">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-start mb-2">
-                        <span class="badge bg-warning text-dark">
-                            <i class="bi bi-hourglass-split"></i> UNPLAYED
-                        </span>
+                        <div class="d-flex flex-wrap gap-1">
+                            <span class="badge bg-warning text-dark">
+                                <i class="bi bi-hourglass-split"></i> UNPLAYED
+                            </span>
+                            ${favoriteBadge}
+                        </div>
                     </div>
                     
                     <h5 class="card-title text-primary mb-3">${escapeHtml(game.title || 'Unknown Title')}</h5>
@@ -383,10 +445,21 @@ function createGameCard(game) {
                     
                     <p class="card-text small text-muted mb-3">${escapeHtml(summary)}</p>
                     
-                    <div class="d-flex gap-2">
+                    <div class="d-flex gap-2 mb-2">
                         <button class="btn btn-success btn-sm flex-fill" onclick="markAsPlayed('${escapeHtml(game.title || '')}', this)">
                             <i class="bi bi-check-circle"></i> Mark as Played
                         </button>
+                    </div>
+                    
+                    <div class="d-flex gap-2">
+                        ${isFavorite ? 
+                            `<button class="btn btn-outline-danger btn-sm flex-fill" onclick="markAsUnfavorite('${escapeHtml(game.title || '')}', this)">
+                                <i class="bi bi-star"></i> Remove Favorite
+                            </button>` :
+                            `<button class="btn btn-outline-warning btn-sm flex-fill" onclick="markAsFavorite('${escapeHtml(game.title || '')}', this)">
+                                <i class="bi bi-star-fill"></i> Add Favorite
+                            </button>`
+                        }
                     </div>
                 </div>
             </div>
@@ -404,10 +477,29 @@ function pickRandomGame() {
     showToast(`Random pick: ${randomGame.title}`, 'info');
     
     // Scroll to the game card
+    scrollToGameCard(randomGame.title);
+}
+
+function pickRandomFavorite() {
+    const favoriteGames = filteredGames.filter(game => game.is_favorite);
+    
+    if (favoriteGames.length === 0) {
+        showToast('No favorite unplayed games available!', 'warning');
+        return;
+    }
+    
+    const randomGame = favoriteGames[Math.floor(Math.random() * favoriteGames.length)];
+    showToast(`Random favorite pick: ${randomGame.title}`, 'info');
+    
+    // Scroll to the game card
+    scrollToGameCard(randomGame.title);
+}
+
+function scrollToGameCard(gameTitle) {
     const gameCards = document.querySelectorAll('.card');
     gameCards.forEach(card => {
         const titleElement = card.querySelector('.card-title');
-        if (titleElement && titleElement.textContent.trim() === randomGame.title) {
+        if (titleElement && titleElement.textContent.trim() === gameTitle) {
             card.scrollIntoView({ behavior: 'smooth', block: 'center' });
             card.style.animation = 'pulse 2s';
             setTimeout(() => {
@@ -471,6 +563,93 @@ function markAsPlayed(gameTitle, button) {
         showToast('Error marking game as played: ' + error.message, 'error');
         button.disabled = false;
         button.innerHTML = '<i class="bi bi-check-circle"></i> Mark as Played';
+    });
+}
+
+function markAsFavorite(gameTitle, button) {
+    if (!gameTitle) return;
+    
+    button.disabled = true;
+    button.innerHTML = '<i class="bi bi-clock"></i> Adding...';
+    
+    fetch('/api/mark-favorite', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            title: gameTitle
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast(data.message, 'success');
+            
+            // Update the game's favorite status in our data
+            updateGameFavoriteStatus(gameTitle, true);
+            
+            // Update statistics and refresh display
+            updateStatistics();
+            displayGames();
+        } else {
+            showToast(data.message, 'error');
+            button.disabled = false;
+            button.innerHTML = '<i class="bi bi-star-fill"></i> Add Favorite';
+        }
+    })
+    .catch(error => {
+        showToast('Error adding to favorites: ' + error.message, 'error');
+        button.disabled = false;
+        button.innerHTML = '<i class="bi bi-star-fill"></i> Add Favorite';
+    });
+}
+
+function markAsUnfavorite(gameTitle, button) {
+    if (!gameTitle) return;
+    
+    button.disabled = true;
+    button.innerHTML = '<i class="bi bi-clock"></i> Removing...';
+    
+    fetch('/api/mark-unfavorite', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            title: gameTitle
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast(data.message, 'success');
+            
+            // Update the game's favorite status in our data
+            updateGameFavoriteStatus(gameTitle, false);
+            
+            // Update statistics and refresh display
+            updateStatistics();
+            displayGames();
+        } else {
+            showToast(data.message, 'error');
+            button.disabled = false;
+            button.innerHTML = '<i class="bi bi-star"></i> Remove Favorite';
+        }
+    })
+    .catch(error => {
+        showToast('Error removing from favorites: ' + error.message, 'error');
+        button.disabled = false;
+        button.innerHTML = '<i class="bi bi-star"></i> Remove Favorite';
+    });
+}
+
+function updateGameFavoriteStatus(gameTitle, isFavorite) {
+    [allUnplayedGames, filteredGames].forEach(gameArray => {
+        const game = gameArray.find(g => (g.title || '').toLowerCase() === gameTitle.toLowerCase());
+        if (game) {
+            game.is_favorite = isFavorite;
+        }
     });
 }
 
