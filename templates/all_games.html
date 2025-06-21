@@ -76,6 +76,8 @@
                                 <option value="all">All Games</option>
                                 <option value="played">Played Only</option>
                                 <option value="unplayed">Unplayed Only</option>
+                                <option value="favorite">Favorites Only</option>
+                                <option value="want-to-play">Want to Play Only</option>
                                 <option value="rated">Rated Only</option>
                                 <option value="unrated">Unrated Only</option>
                             </select>
@@ -202,6 +204,12 @@ function filterGames() {
             case 'unplayed':
                 matchesStatus = !game.is_played;
                 break;
+            case 'favorite':
+                matchesStatus = game.is_favorite;
+                break;
+            case 'want-to-play':
+                matchesStatus = game.is_want_to_play;
+                break;
             case 'rated':
                 matchesStatus = game.myRating && game.myRating.trim();
                 break;
@@ -277,6 +285,7 @@ function createGameCard(game) {
     const criticScore = game.criticsScore || '';
     const isPlayed = game.is_played;
     const isFavorite = game.is_favorite;
+    const isWantToPlay = game.is_want_to_play;
     
     const personalRatingDisplay = personalRating ? 
         `<span class="badge bg-success">${personalRating}/100</span>` : 
@@ -293,6 +302,9 @@ function createGameCard(game) {
     const favoriteBadge = isFavorite ?
         `<span class="badge bg-warning text-dark"><i class="bi bi-star-fill"></i> FAVORITE</span>` : '';
     
+    const wantToPlayBadge = isWantToPlay ?
+        `<span class="badge bg-info"><i class="bi bi-bookmark-star"></i> WANT TO PLAY</span>` : '';
+    
     const summary = game.summary ? 
         (game.summary.length > 120 ? game.summary.substring(0, 120) + '...' : game.summary) :
         'No description available.';
@@ -305,6 +317,7 @@ function createGameCard(game) {
                         <div class="d-flex flex-wrap gap-1">
                             ${statusBadge}
                             ${favoriteBadge}
+                            ${wantToPlayBadge}
                         </div>
                     </div>
                     
@@ -374,13 +387,21 @@ function createGameCard(game) {
                         }
                     </div>
                     
-                    <div class="d-flex gap-2">
+                    <div class="d-flex gap-2 mb-2">
                         ${isFavorite ? 
                             `<button class="btn btn-outline-danger btn-sm flex-fill" onclick="markAsUnfavorite('${escapeHtml(game.title || '')}', this)">
                                 <i class="bi bi-star"></i> Remove Favorite
                             </button>` :
                             `<button class="btn btn-outline-warning btn-sm flex-fill" onclick="markAsFavorite('${escapeHtml(game.title || '')}', this)">
                                 <i class="bi bi-star-fill"></i> Add Favorite
+                            </button>`
+                        }
+                        ${isWantToPlay ? 
+                            `<button class="btn btn-outline-info btn-sm flex-fill" onclick="markAsUnwantToPlay('${escapeHtml(game.title || '')}', this)">
+                                <i class="bi bi-bookmark-x"></i> Remove Want to Play
+                            </button>` :
+                            `<button class="btn btn-outline-info btn-sm flex-fill" onclick="markAsWantToPlay('${escapeHtml(game.title || '')}', this)">
+                                <i class="bi bi-bookmark-plus"></i> Add Want to Play
                             </button>`
                         }
                     </div>
@@ -675,6 +696,93 @@ function updateGameFavoriteStatus(gameTitle, isFavorite) {
         const game = gameArray.find(g => (g.title || '').toLowerCase() === gameTitle.toLowerCase());
         if (game) {
             game.is_favorite = isFavorite;
+        }
+    });
+}
+
+function markAsWantToPlay(gameTitle, button) {
+    if (!gameTitle) return;
+    
+    button.disabled = true;
+    button.innerHTML = '<i class="bi bi-clock"></i> Adding...';
+    
+    fetch('/api/mark-want-to-play', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            title: gameTitle
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast(data.message, 'success');
+            
+            // Update the game's want to play status in our data
+            updateGameWantToPlayStatus(gameTitle, true);
+            
+            // Refresh the display
+            displayGames();
+            updateStatistics();
+        } else {
+            showToast(data.message, 'error');
+            button.disabled = false;
+            button.innerHTML = '<i class="bi bi-bookmark-plus"></i> Add Want to Play';
+        }
+    })
+    .catch(error => {
+        showToast('Error adding to want to play: ' + error.message, 'error');
+        button.disabled = false;
+        button.innerHTML = '<i class="bi bi-bookmark-plus"></i> Add Want to Play';
+    });
+}
+
+function markAsUnwantToPlay(gameTitle, button) {
+    if (!gameTitle) return;
+    
+    button.disabled = true;
+    button.innerHTML = '<i class="bi bi-clock"></i> Removing...';
+    
+    fetch('/api/mark-unwant-to-play', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            title: gameTitle
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast(data.message, 'success');
+            
+            // Update the game's want to play status in our data
+            updateGameWantToPlayStatus(gameTitle, false);
+            
+            // Refresh the display
+            displayGames();
+            updateStatistics();
+        } else {
+            showToast(data.message, 'error');
+            button.disabled = false;
+            button.innerHTML = '<i class="bi bi-bookmark-x"></i> Remove Want to Play';
+        }
+    })
+    .catch(error => {
+        showToast('Error removing from want to play: ' + error.message, 'error');
+        button.disabled = false;
+        button.innerHTML = '<i class="bi bi-bookmark-x"></i> Remove Want to Play';
+    });
+}
+
+function updateGameWantToPlayStatus(gameTitle, isWantToPlay) {
+    [allGames, filteredGames].forEach(gameArray => {
+        const game = gameArray.find(g => (g.title || '').toLowerCase() === gameTitle.toLowerCase());
+        if (game) {
+            game.is_want_to_play = isWantToPlay;
         }
     });
 }

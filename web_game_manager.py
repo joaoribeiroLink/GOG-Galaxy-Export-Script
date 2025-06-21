@@ -21,11 +21,12 @@ import shutil
 app = Flask(__name__)
 
 class WebGameManager:
-    def __init__(self, game_db_file="gameDB.csv", played_file="Played_game.csv", backup_file="gameDB_backup.csv", favorites_file="Favorite_games.csv"):
+    def __init__(self, game_db_file="gameDB.csv", played_file="Played_game.csv", backup_file="gameDB_backup.csv", favorites_file="Favorite_games.csv", want_to_play_file="Want_to_play.csv"):
         self.game_db_file = game_db_file
         self.played_file = played_file
         self.backup_file = backup_file
         self.favorites_file = favorites_file
+        self.want_to_play_file = want_to_play_file
         self.headers = []
         self.load_headers()
         
@@ -113,6 +114,34 @@ class WebGameManager:
                 pass
         return favorite_games
     
+    def get_want_to_play_game_titles(self):
+        """Get a set of titles of games that have been marked as want to play"""
+        want_to_play_titles = set()
+        if os.path.exists(self.want_to_play_file):
+            try:
+                with open(self.want_to_play_file, 'r', encoding='utf-8') as file:
+                    reader = csv.DictReader(file, delimiter='\t')
+                    for row in reader:
+                        title = row.get('title', '').strip().lower()
+                        if title:
+                            want_to_play_titles.add(title)
+            except Exception as e:
+                pass
+        return want_to_play_titles
+    
+    def get_want_to_play_games(self):
+        """Get all games that have been marked as want to play with their metadata"""
+        want_to_play_games = []
+        if os.path.exists(self.want_to_play_file):
+            try:
+                with open(self.want_to_play_file, 'r', encoding='utf-8') as file:
+                    reader = csv.DictReader(file, delimiter='\t')
+                    for row in reader:
+                        want_to_play_games.append(row)
+            except Exception as e:
+                pass
+        return want_to_play_games
+    
     def get_unplayed_games(self):
         """Get all games that haven't been played yet"""
         all_games = self.read_games()
@@ -129,29 +158,40 @@ class WebGameManager:
     def add_played_game(self, game):
         """Add a game to the played games file"""
         try:
-            file_exists = os.path.exists(self.played_file)
+            # Define the correct headers for played games file
+            played_headers = self.headers + ['playedDate']
             
-            # Add a timestamp for when the game was played
+            # Add a timestamp for when the game was marked as played
             game_copy = game.copy()  # Make a copy to avoid modifying the original
             game_copy['playedDate'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             
-            if not file_exists:
-                # Create headers for new file (original headers + playedDate)
-                played_headers = self.headers + ['playedDate']
-                with open(self.played_file, 'w', encoding='utf-8', newline='') as file:
-                    writer = csv.DictWriter(file, fieldnames=played_headers, delimiter='\t')
-                    writer.writeheader()
-                    writer.writerow(game_copy)
-            else:
-                # Read existing headers first
-                with open(self.played_file, 'r', encoding='utf-8') as read_file:
-                    reader = csv.reader(read_file, delimiter='\t')
-                    existing_headers = next(reader)
-                
-                # Then append the game data
-                with open(self.played_file, 'a', encoding='utf-8', newline='') as file:
-                    writer = csv.DictWriter(file, fieldnames=existing_headers, delimiter='\t')
-                    writer.writerow(game_copy)
+            # Read existing games if file exists
+            existing_games = []
+            if os.path.exists(self.played_file):
+                try:
+                    with open(self.played_file, 'r', encoding='utf-8') as file:
+                        reader = csv.DictReader(file, delimiter='\t')
+                        for row in reader:
+                            existing_games.append(row)
+                except Exception as e:
+                    print(f"Error reading existing played games file: {e}")
+                    # If file is corrupted, start fresh
+                    existing_games = []
+            
+            # Check if game is already in the list
+            game_title_lower = game_copy.get('title', '').strip().lower()
+            for existing_game in existing_games:
+                if existing_game.get('title', '').strip().lower() == game_title_lower:
+                    return False  # Game already exists
+            
+            # Add the new game
+            existing_games.append(game_copy)
+            
+            # Write all games back to file
+            with open(self.played_file, 'w', encoding='utf-8', newline='') as file:
+                writer = csv.DictWriter(file, fieldnames=played_headers, delimiter='\t')
+                writer.writeheader()
+                writer.writerows(existing_games)
                     
             return True
         except Exception as e:
@@ -161,33 +201,87 @@ class WebGameManager:
     def add_favorite_game(self, game):
         """Add a game to the favorites file"""
         try:
-            file_exists = os.path.exists(self.favorites_file)
+            # Define the correct headers for favorites file
+            favorite_headers = self.headers + ['favoriteDate']
             
-            # Add a timestamp for when the game was favorited
+            # Add a timestamp for when the game was added to favorites
             game_copy = game.copy()  # Make a copy to avoid modifying the original
-            game_copy['favoritedDate'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            game_copy['favoriteDate'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             
-            if not file_exists:
-                # Create headers for new file (original headers + favoritedDate)
-                favorite_headers = self.headers + ['favoritedDate']
-                with open(self.favorites_file, 'w', encoding='utf-8', newline='') as file:
-                    writer = csv.DictWriter(file, fieldnames=favorite_headers, delimiter='\t')
-                    writer.writeheader()
-                    writer.writerow(game_copy)
-            else:
-                # Read existing headers first
-                with open(self.favorites_file, 'r', encoding='utf-8') as read_file:
-                    reader = csv.reader(read_file, delimiter='\t')
-                    existing_headers = next(reader)
-                
-                # Then append the game data
-                with open(self.favorites_file, 'a', encoding='utf-8', newline='') as file:
-                    writer = csv.DictWriter(file, fieldnames=existing_headers, delimiter='\t')
-                    writer.writerow(game_copy)
+            # Read existing games if file exists
+            existing_games = []
+            if os.path.exists(self.favorites_file):
+                try:
+                    with open(self.favorites_file, 'r', encoding='utf-8') as file:
+                        reader = csv.DictReader(file, delimiter='\t')
+                        for row in reader:
+                            existing_games.append(row)
+                except Exception as e:
+                    print(f"Error reading existing favorites file: {e}")
+                    # If file is corrupted, start fresh
+                    existing_games = []
+            
+            # Check if game is already in the list
+            game_title_lower = game_copy.get('title', '').strip().lower()
+            for existing_game in existing_games:
+                if existing_game.get('title', '').strip().lower() == game_title_lower:
+                    return False  # Game already exists
+            
+            # Add the new game
+            existing_games.append(game_copy)
+            
+            # Write all games back to file
+            with open(self.favorites_file, 'w', encoding='utf-8', newline='') as file:
+                writer = csv.DictWriter(file, fieldnames=favorite_headers, delimiter='\t')
+                writer.writeheader()
+                writer.writerows(existing_games)
                     
             return True
         except Exception as e:
             print(f"Error adding favorite game: {e}")  # Debug print
+            return False
+    
+    def add_want_to_play_game(self, game):
+        """Add a game to the want to play file"""
+        try:
+            # Add a timestamp for when the game was added to want to play
+            game_copy = game.copy()  # Make a copy to avoid modifying the original
+            game_copy['wantToPlayDate'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            
+            # Define the correct headers for want to play file
+            want_to_play_headers = self.headers + ['wantToPlayDate']
+            
+            # Read existing games if file exists
+            existing_games = []
+            if os.path.exists(self.want_to_play_file):
+                try:
+                    with open(self.want_to_play_file, 'r', encoding='utf-8') as file:
+                        reader = csv.DictReader(file, delimiter='\t')
+                        for row in reader:
+                            existing_games.append(row)
+                except Exception as e:
+                    print(f"Error reading existing want to play file: {e}")
+                    # If file is corrupted, start fresh
+                    existing_games = []
+            
+            # Check if game is already in the list
+            game_title_lower = game_copy.get('title', '').strip().lower()
+            for existing_game in existing_games:
+                if existing_game.get('title', '').strip().lower() == game_title_lower:
+                    return False  # Game already exists
+            
+            # Add the new game
+            existing_games.append(game_copy)
+            
+            # Write all games back to file
+            with open(self.want_to_play_file, 'w', encoding='utf-8', newline='') as file:
+                writer = csv.DictWriter(file, fieldnames=want_to_play_headers, delimiter='\t')
+                writer.writeheader()
+                writer.writerows(existing_games)
+                    
+            return True
+        except Exception as e:
+            print(f"Error adding want to play game: {e}")  # Debug print
             return False
     
     def remove_played_game(self, game_title):
@@ -241,6 +335,36 @@ class WebGameManager:
                     writer = csv.DictWriter(file, fieldnames=headers, delimiter='\t')
                     writer.writeheader()
                     writer.writerows(favorite_games)
+                elif headers:
+                    # If no games left, still write headers
+                    writer = csv.DictWriter(file, fieldnames=headers, delimiter='\t')
+                    writer.writeheader()
+            
+            return True
+        except Exception as e:
+            return False
+    
+    def remove_want_to_play_game(self, game_title):
+        """Remove a game from the want to play file"""
+        if not os.path.exists(self.want_to_play_file):
+            return False
+        
+        try:
+            # Read all want to play games
+            want_to_play_games = []
+            with open(self.want_to_play_file, 'r', encoding='utf-8') as file:
+                reader = csv.DictReader(file, delimiter='\t')
+                headers = reader.fieldnames
+                for row in reader:
+                    if row.get('title', '').strip().lower() != game_title.lower():
+                        want_to_play_games.append(row)
+            
+            # Rewrite the file without the specified game
+            with open(self.want_to_play_file, 'w', encoding='utf-8', newline='') as file:
+                if headers and want_to_play_games:
+                    writer = csv.DictWriter(file, fieldnames=headers, delimiter='\t')
+                    writer.writeheader()
+                    writer.writerows(want_to_play_games)
                 elif headers:
                     # If no games left, still write headers
                     writer = csv.DictWriter(file, fieldnames=headers, delimiter='\t')
@@ -386,6 +510,7 @@ class WebGameManager:
         all_games = self.read_games()
         played_titles = self.get_played_game_titles()
         favorite_titles = self.get_favorite_game_titles()
+        want_to_play_titles = self.get_want_to_play_game_titles()
         
         matches = []
         search_lower = search_term.lower()
@@ -408,10 +533,11 @@ class WebGameManager:
                 search_lower in summary or
                 search_lower in themes):
                 
-                # Add played and favorite status
+                # Add played, favorite, and want to play status
                 game_title_lower = game.get('title', '').strip().lower()
                 game['is_played'] = game_title_lower in played_titles
                 game['is_favorite'] = game_title_lower in favorite_titles
+                game['is_want_to_play'] = game_title_lower in want_to_play_titles
                 
                 matches.append(game)
         
@@ -476,6 +602,11 @@ def favorites():
     """Favorites page"""
     return render_template('favorites.html')
 
+@app.route('/want-to-play')
+def want_to_play():
+    """Want to play page"""
+    return render_template('want_to_play.html')
+
 @app.route('/api/random-game')
 def api_random_game():
     """API endpoint to get a random unplayed game"""
@@ -508,6 +639,38 @@ def api_random_game():
         'remaining': len(unplayed_games) - 1
     })
 
+@app.route('/api/random-want-to-play-game')
+def api_random_want_to_play_game():
+    """API endpoint to get a random want to play game"""
+    want_to_play_games = manager.get_want_to_play_games()
+    
+    if not want_to_play_games:
+        return jsonify({
+            'success': False,
+            'message': 'No want to play games available!'
+        })
+    
+    random_game = random.choice(want_to_play_games)
+    
+    # Format game data for frontend
+    game_data = {
+        'title': random_game.get('title', 'Unknown'),
+        'platform': random_game.get('platformList', 'Unknown'),
+        'genre': random_game.get('genres', 'Unknown'),
+        'developer': random_game.get('developers', 'Unknown'),
+        'summary': random_game.get('summary', 'No description available.'),
+        'vertical_cover': random_game.get('verticalCover', ''),
+        'square_icon': random_game.get('squareIcon', ''),
+        'my_rating': random_game.get('myRating', ''),
+        'critics_score': random_game.get('criticsScore', '')
+    }
+    
+    return jsonify({
+        'success': True,
+        'game': game_data,
+        'remaining': len(want_to_play_games) - 1
+    })
+
 @app.route('/api/played-games')
 def api_played_games():
     """API endpoint to get all played games"""
@@ -538,6 +701,21 @@ def api_favorite_games():
             'message': f'Error loading favorite games: {str(e)}'
         })
 
+@app.route('/api/want-to-play-games')
+def api_want_to_play_games():
+    """API endpoint to get all want to play games"""
+    try:
+        want_to_play_games = manager.get_want_to_play_games()
+        return jsonify({
+            'success': True,
+            'games': want_to_play_games
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Error loading want to play games: {str(e)}'
+        })
+
 @app.route('/api/all-games')
 def api_all_games():
     """API endpoint to get all games"""
@@ -545,12 +723,14 @@ def api_all_games():
         all_games = manager.read_games()
         played_titles = manager.get_played_game_titles()
         favorite_titles = manager.get_favorite_game_titles()
+        want_to_play_titles = manager.get_want_to_play_game_titles()
         
-        # Add played and favorite status to each game
+        # Add played, favorite, and want to play status to each game
         for game in all_games:
             game_title_lower = game.get('title', '').strip().lower()
             game['is_played'] = game_title_lower in played_titles
             game['is_favorite'] = game_title_lower in favorite_titles
+            game['is_want_to_play'] = game_title_lower in want_to_play_titles
             
         return jsonify({
             'success': True,
@@ -666,6 +846,62 @@ def api_mark_unfavorite():
         return jsonify({'success': True, 'message': f'{game_title} removed from favorites!'})
     else:
         return jsonify({'success': False, 'message': 'Failed to remove game from favorites'})
+
+@app.route('/api/mark-want-to-play', methods=['POST'])
+def api_mark_want_to_play():
+    """API endpoint to mark a game as want to play"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': 'No data provided'})
+            
+        game_title = data.get('title')
+        if not game_title:
+            return jsonify({'success': False, 'message': 'Game title is required'})
+        
+        print(f"Attempting to add '{game_title}' to want to play")  # Debug
+        
+        # Find the game in the database
+        all_games = manager.read_games()
+        target_game = None
+        
+        for game in all_games:
+            if game.get('title', '').strip().lower() == game_title.strip().lower():
+                target_game = game
+                break
+        
+        if not target_game:
+            print(f"Game '{game_title}' not found in database")  # Debug
+            return jsonify({'success': False, 'message': f'Game "{game_title}" not found in database'})
+        
+        # Check if already in want to play
+        want_to_play_titles = manager.get_want_to_play_game_titles()
+        if game_title.strip().lower() in want_to_play_titles:
+            return jsonify({'success': False, 'message': f'{game_title} is already in want to play list'})
+        
+        # Try to add to want to play
+        success = manager.add_want_to_play_game(target_game)
+        if success:
+            print(f"Successfully added '{game_title}' to want to play")  # Debug
+            return jsonify({'success': True, 'message': f'{game_title} added to want to play list!'})
+        else:
+            print(f"Failed to add '{game_title}' to want to play")  # Debug
+            return jsonify({'success': False, 'message': 'Failed to add game to want to play list - check file permissions'})
+            
+    except Exception as e:
+        print(f"Exception in mark-want-to-play: {e}")  # Debug
+        return jsonify({'success': False, 'message': f'Server error: {str(e)}'})
+
+@app.route('/api/mark-unwant-to-play', methods=['POST'])
+def api_mark_unwant_to_play():
+    """API endpoint to mark a game as not want to play (remove from want to play list)"""
+    data = request.get_json()
+    game_title = data.get('title')
+    
+    if manager.remove_want_to_play_game(game_title):
+        return jsonify({'success': True, 'message': f'{game_title} removed from want to play list!'})
+    else:
+        return jsonify({'success': False, 'message': 'Failed to remove game from want to play list'})
 
 @app.route('/api/search')
 def api_search():

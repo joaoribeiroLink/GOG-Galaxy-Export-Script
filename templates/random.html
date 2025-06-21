@@ -96,6 +96,9 @@
                                 <button id="mark-played-btn" class="btn btn-success me-2" onclick="markAsPlayed()">
                                     <i class="bi bi-check-circle"></i> Mark as Played
                                 </button>
+                                <button id="add-want-to-play-btn" class="btn btn-info me-2" onclick="addToWantToPlay()">
+                                    <i class="bi bi-bookmark-plus"></i> Add to Want to Play
+                                </button>
                                 <button class="btn btn-warning" onclick="getRandomGame()">
                                     <i class="bi bi-arrow-repeat"></i> Pick Another
                                 </button>
@@ -118,6 +121,28 @@
                 <span id="remaining-count" class="badge bg-info fs-6">
                     <i class="bi bi-hourglass-split"></i> Click to see remaining games
                 </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Want to Play Section -->
+    <div class="row mt-5">
+        <div class="col-12">
+            <div class="card bg-light">
+                <div class="card-body text-center">
+                    <h4 class="card-title text-primary">
+                        <i class="bi bi-bookmark-star"></i> Want to Play Priority
+                    </h4>
+                    <p class="card-text text-muted">Pick a random game from your priority want-to-play list</p>
+                    <button id="pick-want-to-play-btn" class="btn btn-outline-primary btn-lg me-3" onclick="getRandomWantToPlayGame()">
+                        <i class="bi bi-star"></i> Pick from Want to Play
+                    </button>
+                    <div class="mt-2">
+                        <span id="want-to-play-count" class="badge bg-primary fs-6">
+                            <i class="bi bi-bookmark"></i> Click to see want to play games
+                        </span>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -363,6 +388,83 @@ function clearRating() {
         clearBtn.innerHTML = '<i class="bi bi-x-circle"></i> Clear';
         showToast('Error clearing rating: ' + error.message, 'error');
     });
+}
+
+function addToWantToPlay() {
+    if (!currentGame) return;
+    
+    const addBtn = document.getElementById('add-want-to-play-btn');
+    addBtn.disabled = true;
+    addBtn.innerHTML = '<i class="bi bi-clock"></i> Adding...';
+    
+    fetch('/api/mark-want-to-play', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            title: currentGame.title
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast(data.message, 'success');
+            addBtn.innerHTML = '<i class="bi bi-bookmark-check"></i> Added to Want to Play';
+            addBtn.classList.remove('btn-info');
+            addBtn.classList.add('btn-outline-info');
+        } else {
+            showToast(data.message, 'error');
+            addBtn.disabled = false;
+            addBtn.innerHTML = '<i class="bi bi-bookmark-plus"></i> Add to Want to Play';
+        }
+    })
+    .catch(error => {
+        showToast('Error adding to want to play: ' + error.message, 'error');
+        addBtn.disabled = false;
+        addBtn.innerHTML = '<i class="bi bi-bookmark-plus"></i> Add to Want to Play';
+    });
+}
+
+function getRandomWantToPlayGame() {
+    const gameCard = document.getElementById('game-card');
+    const loading = document.getElementById('loading');
+    const noGames = document.getElementById('no-games');
+    const pickBtn = document.getElementById('pick-want-to-play-btn');
+    
+    // Hide everything and show loading
+    gameCard.style.display = 'none';
+    noGames.style.display = 'none';
+    loading.style.display = 'block';
+    pickBtn.disabled = true;
+    
+    fetch('/api/random-want-to-play-game')
+        .then(response => response.json())
+        .then(data => {
+            loading.style.display = 'none';
+            pickBtn.disabled = false;
+            
+            if (data.success) {
+                currentGame = data.game;
+                displayGame(data.game);
+                updateWantToPlayCount(data.remaining);
+                gameCard.style.display = 'block';
+            } else {
+                noGames.style.display = 'block';
+                document.getElementById('want-to-play-count').innerHTML = 
+                    '<i class="bi bi-bookmark"></i> No want to play games!';
+            }
+        })
+        .catch(error => {
+            loading.style.display = 'none';
+            pickBtn.disabled = false;
+            showToast('Error loading want to play game: ' + error.message, 'error');
+        });
+}
+
+function updateWantToPlayCount(remaining) {
+    const countElement = document.getElementById('want-to-play-count');
+    countElement.innerHTML = `<i class="bi bi-bookmark"></i> ${remaining} want to play games remaining`;
 }
 
 // Auto-load a game when the page loads
